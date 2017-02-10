@@ -1,28 +1,14 @@
-# Splines - Opening the Black Box
-# by Arthur Charpentier (2010)
-# URL: https://www.r-bloggers.com/splines-opening-the-black-box/
-
 # Remove all current objects in the workspace
   rm(list = ls(all = TRUE))
   set.seed(123)
 
-#  Splines in regression is something which looks like a black box (or
-#  maybe like some dishes you get when you travel away from home: it tastes
-#  good, but you don’t what’s inside… even if you might have some clues,
-#  you never know for sure*). With
-#  splines, it is the same: there are knots, then we consider polynomial
-#  interpolations on parts between knots, and we make sure that there is
-#  no discontinuity (on the prediction, but on the derivative as well).
-
-#  That sounds nice, but when you look at the output of the
-#  regression… you got figures, but you barely see how to interpret
-#  them… So let us have a look at the box, and I mean what is inside that
-#  box…
-
 #  So, consider the following dataset, with the following spline regression,
   library(splines)
   K <- c(14, 20)  # knots
+  # NOT CARS - > PK! WIP
   plot(cars)
+
+# ------------------------------------------------------------------------------
   reg <- lm(dist ~ bs(speed, knots = c(K), degree = 2), data = cars)
   u <- seq(4, 25, by = 0.1)  # test model at these speeds
   B <- data.frame(speed = u)  # data.frame(speeds)
