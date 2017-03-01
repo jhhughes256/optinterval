@@ -44,7 +44,7 @@
   # Create data to be used for plotting
     Rpoints <- reactive({
     # Sample from simulated concentrations
-      sample.times <- c(0, 0.25, 0.5, 1, 2, 4, 8, 12, 24)  # to be made input
+      sample.times <- as.numeric(input$samp)
       sample.conc <- conc[times %in% sample.times]
       data.frame(
         time = sample.times,
@@ -54,12 +54,8 @@
 
     Rlines <- reactive({
     # Assign values from outside function
-      K <- unlist(
-        llply(seq_len(input$nknots), function(i) {
-          get("input")[[paste0("knot", i)]]
-        })
-      )
-      deg <- input$degree
+      K <- c(5, 10)
+      deg <- 2
       data <- Rpoints()
     # Create spline model
       mod <- lm(conc ~ bs(time, knots = c(K), degree = deg), data = Rpoints())
