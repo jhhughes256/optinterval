@@ -9,10 +9,10 @@
 #  Splines in regression is something which looks like a black box (or
 #  maybe like some dishes you get when you travel away from home: it tastes
 #  good, but you don’t what’s inside… even if you might have some clues,
-#  you never know for sure*). With
-#  splines, it is the same: there are knots, then we consider polynomial
-#  interpolations on parts between knots, and we make sure that there is
-#  no discontinuity (on the prediction, but on the derivative as well).
+#  you never know for sure*). With splines, it is the same: there are knots,
+#  then we consider polynomial interpolations on parts between knots, and we
+#  make sure that there is no discontinuity (on the prediction, but on the
+#  derivative as well).
 
 #  That sounds nice, but when you look at the output of the
 #  regression… you got figures, but you barely see how to interpret
@@ -46,18 +46,38 @@
   lines(u, Y, lwd = 2, col = "red")
   summary(reg)
 
+# Reading done from: https://cran.r-project.org/web/packages/crs/vignettes/spline_primer.pdf
+# Usually variables for splines are:
+#   m = the order of the spline
+#   n = the degree of the spline
+#   n = m - 1                         # fairly certain on this
+#   N = number of internal knots
+#   t = {t[i]|i ∈ Z}                    # the set of t[i] such that i is an integer
+#   t = knot sequence, with individual terms being knots
+#   number of knots in augmented knot set = N + 2m
+#   augmented knot set =  internal knots + boundary knots * m
+#   t[-(m-1)] = ... = t[0] <= t[1] <= ... <= t[N] <= t[N+1] = ... = t[N+m]
+#   t[-(m-1)] through to t[0] are the lower boundary knots
+#   t[N+1] through to t[N+m] are the upper boundary knots
+
+# Unfortunately the terminology used in the code below does not match the
+# mathematical functions provided by the blog, both are replicated as seen in
+# the blog. The author uses j and n instead of i and j and appears to use t
+# without subscript instead of x. It's all rather confusing... Bfun() appears
+# to work though...
+
 #  Recall that b-splines work like that:
 #  given knots: 0 <= t[1] <= ... <= t[m-1] <= 1
 #  (we define splines on the unit interval)
 #  then: b[j,0](t) = 1 if t[j] <= t <= t[j+1] otherwise b[j,0](t) = 0
-#  for all: j = 0, 1, ..., m-1, m-2
+#  for all: j = 0, 1, ..., m-3, m-2
 
 #                           t - t[j]                       t[j+n+1] - t
 #  while: b[j,n](t) =  ----------------- b[j,n-1](t) + --------------------- b[j+1,n-1](t)
 #                        t[j+n] - t[j]                   t[j+n+1] - t[j+1]
 
 #  or: b[j,n](t) = a1 + a2
-#  for all: j = 0, ..., m-n-2
+#  for all: j = 0, ..., m-n-2   # this doesn't look right to me
 #  The code is something like that:
   Bfun <- function(x, j, n, K) {
     b <- 0
@@ -70,13 +90,22 @@
       a1 <- (x - K[j])/(K[j+n] - K[j]) * Bfun(x, j, n-1, K)
     }
     if(n==0) {
-      b <- ((x > K[j]) & (x <= K[j+1]))*1  # uncertain how this line works
+      b <- ((x > K[j]) & (x <= K[j+1]))*1  # this is described in line 52, uses the TRUE or FALSE statement gained by determining t[j] <= t <= t[j+1]
     }
     if(n>0) {
       b <- a1 + a2
     }
     return(b)
   }
+# This is where
+#   x = a time series (like 0 to 1 in 0.01 increments)
+#   j = a sequence traditionally from 0, ..., n, however this is represented as 1, ..., n+1 as you can't get the zero index of a vector
+#   n = degree of spline used (3 = cubic etc.)
+#   K = augmented knot set
+#   K = interior knots + boundary knots * if(lower.boundary) n else if (upper.boundary) n+1
+#       it appears the first knot in the augmented knot set is missing for some
+#       reason, as in equations typically there are n+1 boundary knots due to
+#       the recursive nature of splines
 
 #  So, for instance, for splines of degree 1, we have
   u <- seq(0, 1, by = 0.01)
@@ -84,6 +113,8 @@
 		lwd = 2, col = "red", type = "l", ylim = c(0, 1))
   lines(u, Bfun(u, 2, 1, c(0, 0.4, 1, 1)), lwd = 2, col = "blue")
   abline(v = c(0, 0.4, 1), lty = 2)
+
+# So here we have one internal knot 0.4, with our boundary knots 0 and 1, with an appended knot (none on the lower boundary due to degree of 1)
 
 #  and for splines of degree 2, the basis is
   u <- seq(0, 1, by = 0.01)
