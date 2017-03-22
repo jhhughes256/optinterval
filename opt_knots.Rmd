@@ -1,0 +1,329 @@
+---
+title: "Optimising Knots with Splines"
+output:
+  html_document: default
+  html_notebook: default
+  word_document: default
+---
+# --------------------------------------------------------------------------------
+### Simulation of Data
+First a pharmacokinetic model is simulated 
+```{r sim.data}
+# Remove all current objects in the workspace
+  rm(list = ls(all = TRUE))
+  set.seed(123)
+
+#  So, consider the following dataset, with the following spline regression,
+  library(splines)
+  library(ggplot2)
+
+# Set ggplot2 theme
+  theme_bw2 <- theme_set(theme_bw(base_size = 14))
+
+  K <- c(5, 10)  # knots
+  CL <- 10	# Clearance, 10 L/h
+  V <- 50	# Volume of concribution, 50 L
+  KA <- 0.5	# Absorption rate constant, h^-1
+  ERR <- 0.3	# Standard deviation of error
+  dose <- 50	# mg
+  times <- seq(from = 0,to = 24,by = 0.25)	# Time sequence for simulation
+  sample.times <- c(0,0.25,0.5,1,2,4,8,12,24)	# Sampling times
+  conc <- dose*KA/(V*(KA - (CL/V)))*(exp(-CL/V*times) - exp(-KA*times))*
+    (1 + rnorm(n = length(times), mean = 0, sd = ERR))
+  sample.conc <- conc[times %in% sample.times]
+  onecomp <- data.frame(time = sample.times, conc = sample.conc)
+  plot(onecomp)
+```
+
+
+### Best Placement of Knots
+Using this simulation we can view where the best place for knots to be.
+
+```{r best.knots}
+  vk <- seq(0.05, 0.95, by = 0.05)
+  SSR <- matrix(NA, length(vk))
+  for(i in 1:(length(vk))){
+    k <- vk[i]
+    K <- min(onecomp$time) + k*(max(onecomp$time) - min(onecomp$time))
+    reg <- lm(conc ~ bs(time, knots = c(K), degree = 2), data = onecomp)
+    SSR[i] <- sum(residuals(reg)^2)
+  }
+  dat <- data.frame(vk, c(SSR))
+  plotobj <- ggplot(dat, aes(x = vk, y = SSR))
+  plotobj <- plotobj + geom_point(shape = 21, size = 2, colour = "blue")
+  plotobj <- plotobj + geom_line(linetype = 2, colour = "blue")
+  plotobj
+```
+
+By using an objective function value we can optimise the number of knots that
+a spline uses.
+
+### Building splines
+To start need a base set of spline functions to facilitate this.
+
+```{r spline.func}
+# Create a function to create a spline
+  predict.spline.func <- function(x) {
+    mod <- lm(
+      x$Y ~ bs(x$X, knots = x$K, degree = x$n)
+    )  # lm
+    B <- data.frame(time = x$X)
+    Y <- predict(mod, newdata = B)
+  }
+```
+
+Here we have a function that takes a list as input, then uses the lm() function
+to fit a spline to the time intervals. This spline is then used to produce 
+predicted concentrations.
+
+```{r oneknot.spline}
+# Wrapper that calculates residuals to be minimised
+  spline.oneknot.func <- function(par, Cobs, time, degree) {
+    param <- list(
+      X = time,
+      Y = Cobs,
+      K = par[1],
+      n = degree
+    )
+    Chat <- predict.spline.func(param)
+    err <- Cobs-Chat
+    squ.err <- err^2
+    sse <- sum(squ.err)  # Sum of squared errors to be minimised
+    sse
+  }
+```
+
+By incorporating this into a function that calculates the sum of square errors 
+for the observed and predicted concentrations we get an objective function 
+value.
+
+Using optim() we can optimise the par argument that goes into the function 
+above. In this case the par argument are the knots of the spline.
+
+```{r oneknot.optim}
+# Initial estimates
+  tmax <- onecomp$time[which(onecomp$conc == max(onecomp$conc))]
+	init.par <- c(tmax)
+  #par <- init.par
+
+# Minimise the sum of squared errors
+# Using the optim function in R
+	result <- optim(
+		init.par,  # Initial parameter estimates
+		spline.oneknot.func,  # Fitting function
+    # method = "SANN",
+    method = "L-BFGS-B", lower = 0, upper = 24,
+    # method = "Brent", lower = 0, upper = 24,
+		Cobs = onecomp$conc, time = onecomp$time, degree = 2  # Function arguments
+	)
+	result  # Print the result
+```
+
+When using two knots, optim is determining two numbers. This is straight 
+forward for optim(), but how do we stop optim() from choosing two knots 
+that are too close to one another? Two ways to use the knots.
+* Determine two numbers independent of one another
+* Determine the first knot, and then the distance from the previous knot
+
+```{r twoknot.spline}
+# Wrapper using unique unrelated parameters
+  uq.spline.twoknot.func <- function(par, Cobs, time, degree) {
+    param <- list(
+      X = time,
+      Y = Cobs,
+      K = c(par[1], par[2]),
+      n = degree
+    )
+    Chat <- predict.spline.func(param)
+    err <- Cobs-Chat
+    squ.err <- err^2
+    sse <- sum(squ.err)  # Sum of squared errors to be minimised
+    sse
+  }
+
+# Wrapper using the distance from last knot method
+  lk.spline.twoknot.func <- function(par, Cobs, time, degree) {
+    param <- list(
+      X = time,
+      Y = Cobs,
+      K = c(par[1], par[1] + par[2]),
+      n = degree
+    )
+    Chat <- predict.spline.func(param)
+    err <- Cobs-Chat
+    squ.err <- err^2
+    sse <- sum(squ.err)  # Sum of squared errors to be minimised
+    sse
+  }
+```
+
+How different are these two methods?
+
+```{r twoknot.optim}
+# Initial estimates
+  tmax <- onecomp$time[which(onecomp$conc == max(onecomp$conc))]
+	init.par <- c(tmax, tmax)
+  #par <- init.par
+
+# Minimise the sum of squared errors
+# Using the optim function in R
+	result1 <- optim(
+		init.par,  # Initial parameter estimates
+		lk.spline.twoknot.func,  # Fitting function
+    # method = "SANN",
+    method = "L-BFGS-B", lower = 0, upper = 24,
+		Cobs = onecomp$conc, time = onecomp$time, degree = 2  # Function arguments
+	)
+
+  init.par <- c(tmax, tmax*2)
+
+  result2 <- optim(
+		init.par,  # Initial parameter estimates
+		uq.spline.twoknot.func,  # Fitting function
+    # method = "SANN",
+    method = "L-BFGS-B", lower = 0, upper = 24,
+		Cobs = onecomp$conc, time = onecomp$time, degree = 2  # Function arguments
+	)
+  
+# Print result
+	list(
+	  Dependent = result1,
+	  Independent = result2
+	)
+```
+
+The two methods have identical objective function values. These two methods 
+should probably be stress tested in the future to determine which is better.
+
+Further development below will be done using the last knot method as the 
+unique method is easier to implement later.
+
+Three knots were tried, however this seems to be too many. Might be ok for more
+complex models, 2 knots is already alot of knots for 7 internal concentration 
+points.
+
+```{r threeknot.spline}
+spline.threeknot.func <- function(par, Cobs, time, degree) {
+  param <- list(
+    X = time,
+    Y = Cobs,
+    K = c(par[1], par[1] + par[2], par[1] + par[2] + par[3]),
+    n = degree
+  )
+  Chat <- predict.spline.func(param)
+  err <- Cobs-Chat
+  squ.err <- err^2
+  sse <- sum(squ.err)  # Sum of squared errors to be minimised
+  sse
+}
+```
+
+We may need a rule for the max number of knots for the amount of concentrations
+that you fit a spline to.
+
+### Building a Flexible Spline Function
+
+Because we are carrying the last knot method forward we need a function that 
+adds each value with the value before. 
+
+```{r knot.calc}
+# Takes a vector x[1], x[2], ..., x[length(x)]
+# Calculates sum(x[1]),  sum(x[1], x[2]), ...
+  knot.func <- function(x) {
+    y <- double(length(x))
+    for (i in 1:length(x)) {
+      y[i] <- sum(x[1:i])
+    }
+    return(y)
+  }
+```
+
+We can now use this to create a flexible spline optimising function that 
+manages any amount of knots that we throw at it!
+
+```{r flex.spline}
+# Combines the previous functions into one!
+  error.spline.func <- function(par, Cobs, time, degree) {
+    param <- list(
+      X = time,
+      Y = Cobs,
+      K = knot.func(par),
+      n = degree
+    )
+    Chat <- predict.spline.func(param)
+    err <- Cobs-Chat
+    squ.err <- err^2
+    sse <- sum(squ.err)  # Sum of squared errors to be minimised
+    sse
+  }
+```
+
+So now this function can be used as a reliable and flexible function within 
+optim(), but optim() doesn't work with integers and you can't have 1.5 knots.
+
+This is addressed by trying each number of knots up to a maximum number of 
+knots and determining which is best. A maximum is needed, because without 
+one you would always end up with a very squiggly spline.
+
+A rule could be designed instead of having the user specify the maximum knots,
+but this would need to be stress tested as you would expect that the maximum 
+amount of knots will almost always provide a better fit. 
+
+Another issue here is there is currently no control for points being too close
+to one another. Knots that are close to each other cause the spline to deviate
+dramatically from a typical PK curve. There may need to be some sort of penalty
+when knots are too close to one another.
+
+The current boundaries used are 0 and 24 (the min and max time interval present
+in the data). These boundaries are fine for the first knot, but not for the 
+second knot with the last knot method. Theoretically the second knot may appear 
+outside of our time interval, which is no good for splines.
+
+### Final Knot Optimisation Function
+
+The current function in use is featured below:
+
+```{r}
+  which.knots <- function(x, y, max.knots, degree) {
+    xmax <- x[which(y == max(y))]
+    err <- NULL
+    knots <- list(NULL)
+    for (i in 1:max.knots) {
+      par <- rep(xmax, i)
+      opt.res <- optim(
+        par,  # Initial parameter estimates
+        error.spline.func,  # Fitting function
+        # method = "SANN",
+        method = "L-BFGS-B", lower = min(x), upper = max(x),
+        Cobs = y, time = x, degree = 2  # Function arguments
+      )
+      err[i] <- opt.res$value
+      knots[[i]] <- knot.func(opt.res$par)
+    }
+    knots[[which(err == min(err))]]
+  }
+  K <- which.knots(onecomp$time, onecomp$conc, 2, 2)
+
+  reg <- lm(conc ~ bs(time, knots = c(K), degree = 2), data = onecomp)
+  u <- seq(0, 24, by = 0.1)  # test model at these times
+  B <- data.frame(time = u)  # data.frame(times)
+  Y <- predict(reg, newdata = B)  # predicted conc for the desired times
+  plotobj <- ggplot()
+  plotobj <- plotobj + geom_point(aes(x = time, y = conc), data = onecomp)
+  plotobj <- plotobj + geom_line(aes(x = u, y = Y), size = 1, colour = "red")
+  plotobj
+```
+
+Limitiations of current function:
+* Could be possible for knots after the first knot to minimise outside the 
+time interval
+* If xmax is more than 1/max.knots of max(x) then par will exceed the bounds
+* Excessive warnings appear when multiple knots are between internal points 
+this is due to a rank-deficient fit, I think this is because it's probably 
+not enough information to have two knots between two internal points
+
+### Conclusion
+The work presented here gives us predicted concentrations that can be used for 
+optimising sampling intervals. It optimises the knots, however does not 
+address the need to optimise for degrees (if there is in fact a need for this 
+is uncertain).
