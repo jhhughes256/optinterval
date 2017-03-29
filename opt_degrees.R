@@ -6,6 +6,7 @@
   library(splines)
   library(ggplot2)
   library(plyr)
+  library(stringr)
 
 # Set ggplot2 theme
   theme_bw2 <- theme_set(theme_bw(base_size = 14))
@@ -13,17 +14,20 @@
 # -----------------------------------------------------------------------------
 # Create a function to create a spline with limited predictions
   predict.spline.func <- function(x) {
+    time <- x$X
+    conc <- x$Y
     mod <- lm(
-      x$Y ~ bs(x$X, knots = x$K, degree = x$n)
+      conc ~ bs(time, knots = x$K, degree = x$n)
     )  # lm
     B <- data.frame(time = x$X)
     Y <- predict(mod, newdata = B)
   }
 
   uber.predict.spline.func <- function(x) {
-    browser()
+    time <- x$X
+    conc <- x$Y
     mod <- lm(
-      x$Y ~ bs(x$X, knots = x$K, degree = x$n)
+      conc ~ bs(time, knots = x$K, degree = x$n)
     )  # lm
     B <- data.frame(time = seq(0, 24, by = 0.25))
     Y <- predict(mod, newdata = B)
@@ -99,30 +103,61 @@
     which.knots(onecomp$time, onecomp$conc, 4, x)
   })
 
-  llply(seq_len(length(spline.data)), function(x) {
-    degree <- x
-    knots <- spline.data[[x]]$knots
-    llply(knots, function(x) {
+  plotdata <- ldply(seq_len(length(spline.data)), function(n) {
+    knots <- spline.data[[n]]$knots
+    sse.vec <- spline.data[[n]]$error
+    ldply(knots, function(K) {
       param <- list(
         X = onecomp$time,
         Y = onecomp$conc,
-        K = x,
-        n = degree
+        K = K,
+        n = n
       )
-      x.vec <- c(x, rep(0, length(knots) - length(x)))
-      browser()
+      K.len <- length(K)
+      K.vec <- c(K, rep(NULL, length(knots) - K.len))
+      sse <- signif(sse.vec[[K.len]], 3)
       out <- data.frame(
         time = seq(from = 0, to = 24, by = 0.25),
         conc = uber.predict.spline.func(param),
-        degree = degree,
-        nknots = length(x)
+        degree = n,
+        nknots = length(K),
+        error = sse
       )
-      for (i in length(knots)) {
-        out[[paste0("knot", i)]] <- x.vec[i]
+      for (i in 1:length(knots)) {
+        out[[paste0("knot", i)]] <- K.vec[i]
       }
       out
     })
   })
+
+  plotdata$knots <- unlist(
+    dlply(plotdata, .(degree, nknots), function(x) {
+      K <- unique(x$nknots)
+      df.knots <- NULL
+      for (i in 1:K) {
+        df.knots <- paste(df.knots, round(x[[paste0("knot", i)]], 1))
+      }
+      df.knots
+    })
+  )
+
+  plotdata$facet <- factor(
+    paste0("Degree: ", plotdata$degree,
+      "   Knots: ", plotdata$nknots, "\n",
+      plotdata$knots
+    )
+  )
+
+# Naturally a 6 degree spline fits the data the best but that should be taken
+# with a pinch of salt
+  plotobj <- ggplot()
+  plotobj <- plotobj + geom_point(aes(x = time, y = conc), data = onecomp)
+  plotobj <- plotobj + geom_line(aes(x = time, y = conc), data = plotdata, size = 1, colour = "red")
+  plotobj <- plotobj + geom_text(aes(x = 20, y = 0.6, label = error), data = plotdata)
+  plotobj <- plotobj + scale_y_continuous(lim = c(-0.3, 0.8))
+  plotobj <- plotobj + scale_x_continuous(lim = c(0, 24))
+  plotobj <- plotobj + facet_wrap(~facet, ncol = 4)
+  plotobj
 
 # -----------------------------------------------------------------------------
 # Simulate second dataset with more rich sampling
