@@ -60,6 +60,7 @@
     Cden <- par$V1*(par$KA - gamma)*(gamma - beta)*(gamma - alpha)
     C <- Cnum/Cden
     amt <- par$dose*par$F1
+
     data.frame(
       x = x,
       y = amt*(A*exp(-alpha*x) + B*exp(-beta*x) + C*exp(-gamma*x) - (A+B+C)*exp(-par$KA*x))
@@ -87,7 +88,7 @@
   )
   pkdata2 <- onecomp.func(drug2, times)
 # -----------------------------------------------------------------------------
-# Drug 3: Two Compartment
+# Drug 3: Two Compartment 1
   drug3 <- list(
     CL = 10,
     V1 = 30,
@@ -99,7 +100,7 @@
   )
   pkdata3 <- twocomp.func(drug3, times)
 # -----------------------------------------------------------------------------
-# Drug 4: Two Compartment
+# Drug 4: Two Compartment 2
   drug4 <- list(
     CL = 5,
     V1 = 30,
@@ -114,10 +115,10 @@
 # Drug 5: Three Compartment
   drug5 <- list(
     CL = 10,
-    V1 = 30,
+    V1 = 50,
     Q2 = 20,
     V2 = 50,
-    Q3 = 10,
+    Q3 = 30,
     V3 = 200,
     KA = 0.5,
     F1 = 1,
@@ -126,15 +127,3 @@
   pkdata5 <- threecomp.func(drug5, times)
 # -----------------------------------------------------------------------------
 # Drug 6: Three Compartment
-  drug6 <- list(
-    CL = ,
-    V1 = ,
-    Q2 = ,
-    V2 = ,
-    Q3 = ,
-    V3 = ,
-    KA = ,
-    F1 = 1,
-    dose = 50
-  )
-  pkdata6 <- threecomp.func(drug6, times)

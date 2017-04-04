@@ -12,11 +12,12 @@
   setwd("C:/Users/hugjh001/Documents/optinterval")
   #setwd("C:/Users/Jim Hughes/Documents/GitRepos/optinterval")
   source("spline_functions.R")
+  source("pk_data.R")
 
 # Set ggplot2 theme
   theme_bw2 <- theme_set(theme_bw(base_size = 14))
 
-# 
+#
   which.knots <- function(data, degree, max.knots = NULL) {
   # Setup environment
     if (is.null(max.knots)) max.knots <- 3
@@ -51,27 +52,20 @@
   }
 
 # -----------------------------------------------------------------------------
-# Determine times for all datasets
-  times <- seq(from = 0, to = 24, by = 0.25)	# Time sequence for simulating concentrations
+# Set the possible sampling times
+# These sample.times will be used by indexing 1:(number of obs)
+# This way we have the important sampling points always and with each increase
+# in number of obs, the observations that are added are relevant
+# These times are ideally put in ascending order before use
+  sample.times <- c(
+    0, 0.5, 1, 2, 4, 8, 24, 0.25, 12, 3, 6,
+    18, 10, 1.5, 0.75, 5, 7, 14, 16, 20, 22
+  )
 
-# Simulate dataset
-  K <- c(5, 10)  # knots
-  CL <- 10	# Clearance, 10 L/h
-  V <- 50	# Volume of concribution, 50 L
-  KA <- 0.5	# Absorption rate constant, h^-1
-  ERR <- 1 + rnorm(n = length(times), mean = 0, sd = 0.3)
-  dose <- 50	# mg
+# Sample from the simulated data
+# pkdata1[pkdata1$x %in% sample.times[1:7], ]
+# Then add error on using an error model as seen in mle script
 
-  sample.times <- c(0,0.25,0.5,1,2,4,8,12,24)	# Sampling times
-  conc <- dose*KA/(V*(KA-(CL/V)))*(exp(-CL/V*times)-exp(-KA*times))
-  plot(times, log(conc))
-  sample.conc <- (conc*ERR)[times %in% sample.times]
-  onecomp <- data.frame(time = sample.times, conc = sample.conc)
-
-# Determine if there is a difference between degrees
-  spline.data <- llply(seq_len(4), function(x) {
-    which.knots(onecomp$time, onecomp$conc, x)
-  })
 
   spline.to.plot <- function(data, spline) {
     plot.df <- ldply(seq_len(length(spline)), function(n) {
