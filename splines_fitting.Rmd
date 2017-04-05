@@ -1,0 +1,323 @@
+---
+title: "Fitting Linear Models with Maximum Likelihood"
+output:
+  html_document: default
+  html_notebook: default
+  word_document: default
+---
+_Inspired by "Fitting a Model by Maximum Likelihood"_
+_by Andrew of Exegetic Analytics_
+
+https://www.r-bloggers.com/fitting-a-model-by-maximum-likelihood/
+
+# --------------------------------------------------------------------------------
+### Understanding linear models
+Linear models can be determined using the lm() function from base R. This is 
+achieved using QR decomposition, an efficient method that avoids gradient 
+descent. This is sufficient for most purposes, but uses a form of least squares
+to determine the best fit. 
+
+Using maximum likelihood requires gradient descent, but to implement it we must
+learn how linear models are made. First lets consider the following dataset, 
+with the following spline regression.
+```{r lm.mod}
+  library(splines)
+  K <- c(14, 20)  # knots
+  plot(cars)
+  lm.mod <- lm(dist ~ bs(speed, knots = c(K), degree = 2), data = cars)
+  u <- seq(4, 25, by = 0.1)  # test model at these speeds
+  B <- data.frame(speed = u)  # data.frame(speeds)
+  lm.Y <- predict(lm.mod, newdata = B)  # predicted dist for the desired speeds
+  lines(u, lm.Y, lwd = 2, col = "red")
+```
+
+Our aim is to fit a model using gradient descent so that maximum likelihood can
+be utilised.
+
+So lets start with a basic example that doesn't use splines:
+```{r test.mod}
+  test.mod <- lm(dist ~ speed, data = cars)
+  test.Y <- predict(test.mod, newdata = B)
+  plot(cars)
+  lines(u, test.Y, lwd = 2, col = "red")
+  summary(test.mod)
+```
+
+This model is a straight line so its represented by the function:
+$$y=B_1x+B_0$$
+where $B_0$ and $B_1$ are represented by the estimates column in the lm() 
+output.
+
+This is effectively a 1 degree spline with no knots. lm() looks to find the 
+model with the best residuals, using least squares.
+$$\sum_{i=nobs}^nC_i - \hat{C}_i^2$$
+The same can be done with optim() by minimising the sum of squared errors.
+```{r eval = F} 
+  function(Cobs, Chat) {
+    err <- Cobs - Chat
+    squ.err <- err^2
+    sse <- sum(squ.err)
+    sse
+  }
+```
+
+To achieve this minimisation we optimise two parameters $B_1$ and $B_0$.
+
+```{r ls.func}
+  ls.func <- function(par, x, y) {
+    b0 <- par[1]
+    b1 <- par[2]
+    err <- y - b1*x - b0
+    sse <- sum(err^2)
+  }
+
+  ls.func.result <- optim(
+    c(-17, 4),  # Initial parameter estimates
+    ls.func,  # Fitting function
+    method = "BFGS",  # Optimisation method
+    x = cars$speed, y = cars$dist  # Function arguments
+  )
+  
+  plot(cars)
+  ls.func.Y <- ls.func.result$par[2]*u + ls.func.result$par[1]
+  lines(u, ls.func.Y, lwd = 2, col = "red")
+```
+
+The predictions made with this set of functions match the results from lm() 
+to four significant figures. This seems to be close enough when we look at the 
+similarity between the plots.
+
+The trick is to apply this to splines
+
+### Applying linear models to splines
+Splines are represented by an additive linear model, where each component of 
+the spline does not interact with one another.
+
+To determine the number of parameters for optimisation, the degree of the
+spline and the number of knots must be considered. These are added together to
+determine the number of components there are to the linear model
+
+* 1 degree + 0 knots = 1 component = 2 parameters
+* 2 degree + 2 knots = 4 components = 5 parameters
+
+The basis matrix for a spline is used when fitting a model, therefore we use
+each part of the matrix as an independent variable to determine our dependent
+variable.
+
+The spline we will work with will be a 2 degree spline with 2 knots. This is 
+represented by the following equation:
+$$y = B_1x_{*,1} + B_2*x_{*,2} + B_3*x_{*,3} + B_4*x_{*,4} + B_0$$
+This is then made into a function. A more flexible function is mentioned later.
+```{r spline2d2k}
+  ls.spline2d2k.func <- function(par, x, y) {
+    b0 <- par[1]
+    b1 <- par[2]
+    b2 <- par[3]
+    b3 <- par[4]
+    b4 <- par[5]
+    err <- y - b1*x[,1] - b2*x[,2] - b3*x[,3] - b4*x[,4] - b0
+    sse <- sum(err^2)
+  }
+
+  ls.spline2d2k.res <- optim(
+    c(6, 8, 45, 49, 95),  
+    ls.spline2d2k.func,
+    method = "BFGS",
+    x = bs(cars$speed, knots = c(K), degree = 2), y = cars$dist 
+  )
+```
+
+To predict using a linear model of a spline, the new x value must be a matrix 
+that represents the basis spline.
+```{r ls.spline}
+  plot(cars)
+  ls.spline.u <- bs(u, knots = c(K), degree = 2)
+  ls.spline.Y <- ls.spline2d2k.res$par[2]*ls.spline.u[,1] +
+    ls.spline2d2k.res$par[3]*ls.spline.u[,2] +
+    ls.spline2d2k.res$par[4]*ls.spline.u[,3] +
+    ls.spline2d2k.res$par[5]*ls.spline.u[,4] + ls.spline2d2k.res$par[1]
+  lines(u, ls.spline.Y, lwd = 2, col = "red")
+```
+
+We can make a much more flexible function however...
+```{r flex.ls.spline}
+  flex.u <- bs(u, knots = c(K), degree = 2)
+  flex.optres <- list(
+    par = c(
+      ls.spline2d2k.res$par[2],
+      ls.spline2d2k.res$par[3],
+      ls.spline2d2k.res$par[4],
+      ls.spline2d2k.res$par[5],
+      ls.spline2d2k.res$par[1]
+    )
+  )
+  flex.optres.l <- length(flex.optres$par)
+  flex.x <- bs(cars$speed, knots = c(K), degree = 2)
+
+# For fitting
+  flex.err <- cars$dist
+  for (j in 1:flex.optres.l) {
+    if (j != flex.optres.l) {
+      flex.err <- flex.err - flex.optres$par[j]*flex.x[,j]
+    } else {
+      flex.err <- flex.err - flex.optres$par[j]
+    }
+  }
+  flex.sse <- sum(flex.err^2)
+  flex.sse != ls.spline2d2k.res$value
+
+  lm.spline <- function(par, x, y) {
+    err <- y
+    for (i in 1:length(par)) {
+      if (i != length(par)) {
+        err <- err - par[i]*x[,i]
+      } else if (i == length(par)) {
+        err <- err - par[i]
+      }
+    }
+    return(sum(err^2))
+  }
+
+  test <- optim(
+    c(8, 45, 49, 95, 6),  # Initial parameter estimates
+    lm.spline,  # Fitting function
+    method = "BFGS",
+    x = bs(cars$speed, knots = c(K), degree = 2), y = cars$dist # Function arg.
+  )
+  test$value != ls.spline2d2k.res$value
+
+# For predicting
+  flex.optres.l <- length(flex.optres$par)
+  flex.Y <- double(length(u))
+  for (j in 1:flex.optres.l) {
+    if (j != flex.optres.l) {
+      flex.Y <- flex.Y + flex.optres$par[j]*flex.u[,j]
+    } else {
+      flex.Y <- flex.Y + flex.optres$par[j]
+    }
+  }
+  any(flex.Y != ls.spline.Y)
+```
+The three logical statements from the above script are to test whether there 
+are any mistakes in how the code is implemented. As they are all false, we 
+now have an accurate flexible set of functions to fit splines with.
+
+For the following function:
+
+* x = the new x values for which you want to predict y
+* par = the coefficients of the spline you have fitted
+* K = the knots used to fit the spline
+* n = the degree used to fit the spline
+
+```{r predict.spline}
+  predict.spline <- function(x, par, K, n) {
+    bs.mat <- bs(x, knots = c(K), degree = n)
+    out <- double(length(x))
+    for (i in 1:length(par)) {
+      if (i != length(par)) {
+        out <- out + par[i]*bs.mat[,i]
+      } else if (i == length(par)) {
+        out <- out + par[i]
+      }
+    }
+    return(out)
+  }
+```
+
+### Applying linear models using maximum likelihood
+Lastly lets adjust these functions so that they can be used with maximum
+likelihood estimation and see how much of a difference it makes for the spline.
+The function that is given to optim() needs to also optimise sigma so we add
+another parameter.
+
+```{r mle.spline}
+  mle.spline <- function(par, x, y) {
+    err <- y
+    for (i in 1:length(par)) {
+      if (i < length(par) - 1) {
+        err <- err - par[i]*x[,i]
+      } else if (i == length(par) - 1) {
+        err <- err - par[i]
+      }
+    }
+    loglik <- dnorm(err, 0, tail(par, 1), log = T)
+    return(-1*sum(loglik))
+  }
+
+  mle.test.res <- optim(
+    c(8, 45, 49, 95, 6),  # Initial parameter estimates
+    mle.spline,  # Fitting function
+    method = "BFGS",
+    x = bs(cars$speed, knots = c(K), degree = 2), y = cars$dist # Function arg.
+  )
+
+  mle.test.Y <- predict.spline(u, mle.test.res$par[-length(mle.test.res$par)], K, 2)
+  plot(cars)
+  lines(u, mle.test.Y, lwd = 2, col = "red")
+```
+
+This isn't perfect though if you don't have good initial estimates
+
+```{r mle.test}
+  mle.test.res2 <- optim(
+    c(50, 2, 8, 60, 35, 1),  # Initial parameter estimates
+    mle.spline,  # Fitting function
+    method = "BFGS",
+    x = bs(cars$speed, knots = c(K), degree = 2), y = cars$dist # Function arg.
+  )
+
+  mle.test.Y <- predict.spline(u, mle.test.res2$par[-length(mle.test.res2$par)], K, 2)
+  plot(cars)
+  lines(u, mle.test.Y, lwd = 2, col = "red")
+```
+
+Ideally you would use lm() to get initial estimates for your spline.
+
+### Pharmacokinetic example
+```{r pk.mod}
+  times <- seq(from = 0, to = 24, by = 0.25)	# Time sequence for simulating concentrations
+
+# Simulate dataset
+  K <- c(5, 10)  # knots
+  CL <- 10	# Clearance, 10 L/h
+  V <- 50	# Volume of concribution, 50 L
+  KA <- 0.5	# Absorption rate constant, h^-1
+  ERR <- 1 + rnorm(n = length(times), mean = 0, sd = 0.3)
+  dose <- 50	# mg
+  sample.times <- c(0, 0.25, 0.5, 1, 2, 4, 8, 12, 24)  # Sampling times
+  conc <- dose*KA/(V*(KA-(CL/V)))*(exp(-CL/V*times)-exp(-KA*times))
+  plot(times, log(conc))
+  sample.conc <- (conc*ERR)[times %in% sample.times]
+  onecomp <- data.frame(time = sample.times, conc = sample.conc)
+
+# Find our initial estimates using QR decomposition via lm()
+  pk.modlm <- lm(conc ~ bs(time, knots = c(K), degree = 2), data = onecomp)
+  init.par <- unname(pk.modlm$coefficients[c(2:5, 1)])
+
+# Supress warnings due to NaN being produced by estimating sigma of < 0
+  suppressWarnings(
+    pk.optres <- optim(
+      c(init.par, 1),  # Initial parameter estimates
+      mle.spline,  # Fitting function
+      method = "BFGS",
+      x = bs(onecomp$time, knots = c(K), degree = 2), y = onecomp$conc # Function arg.
+    )
+  )
+
+  u <- times
+  B <- data.frame(time = u)
+  pk.lm.Y <- predict(pk.modlm, newdata = B)
+  pk.mle.Y <- predict.spline(u, pk.optres$par[-length(pk.optres$par)], K, 2)
+  plot(onecomp)
+  lines(u, pk.lm.Y, lwd = 2, col = "red")
+  lines(u, pk.mle.Y, lwd = 2, col = "blue")
+```
+
+The two lines aren't visibly different when plotted
+This phenomemon is the same when observing drugs with two-compartment kinetics
+So while using least squares here shows little difference, if you are using 
+maximum likelihood as a method later in your script, its best to be consistent 
+with your methods. 
+
+Also maximum likelihood is generally better anyway, even if it isn't for this 
+case.
