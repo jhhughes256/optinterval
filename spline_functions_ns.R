@@ -2,7 +2,7 @@ mlespline.fit <- function(par, x, y) {
   err <- y
   for (i in 1:length(par)) {
     if (i < length(par) - 1) {
-      err <- err - par[i]*x[,i]
+      err <- err - par[i]*x[, i]
     } else if (i == length(par) - 1) {
       err <- err - par[i]
     }
@@ -11,27 +11,27 @@ mlespline.fit <- function(par, x, y) {
   return(-1*sum(loglik))
 }
 
-mlespline.opt <- function(data, K, n) {
+mlespline.opt <- function(data, K) {
   ndata <- data.frame(x = data[,1], y = data[,2])
-  lm.mod <- lm(y ~ bs(x, knots = c(K), degree = n), data = ndata)
-  n.comp <- length(K) + n
-  init.par <- unname(pk.modlm$coefficients[c(2:(n.comp + 1), 1)])
+  lm.mod <- lm(y ~ ns(x, knots = c(K)), data = ndata)
+  init.par <- unname(lm.mod$coefficients[c(2:(length(knots) + 2), 1)])
+  browser()
   suppressWarnings(
     optim(
       c(init.par, 1),
       mlespline.fit,
       method = "BFGS",
-      x = bs(ndata$x, knots = c(K), degree = 2), y = ndata$y
+      x = ns(ndata$x, knots = c(K)), y = ndata$y
     )
   )
 }
 
-mlespline.predict <- function(x, par, K, n) {
-  bs.mat <- bs(x, knots = c(K), degree = n)
+mlespline.predict <- function(x, par, K) {
+  ns.mat <- ns(x, knots = c(K))
   y <- double(length(x))
   for (i in 1:length(par)) {
     if (i < length(par) - 1) {
-      y <- y + par[i]*bs.mat[,i]
+      y <- y + par[i]*ns.mat[, i]
     } else if (i == length(par) - 1) {
       y <- y + par[i]
     }
@@ -40,7 +40,6 @@ mlespline.predict <- function(x, par, K, n) {
     time = x,
     pred = y,
     knots = K,
-    degree = n,
     coefficients = par[-length(par)],
     sigma = par[length(par)]
   )
@@ -48,12 +47,12 @@ mlespline.predict <- function(x, par, K, n) {
   return(out)
 }
 
-mlespline <- function(data, K, n, predict.times = NULL) {
+mlespline <- function(data, K, predict.times = NULL) {
   if (is.null(predict.times)) predict.times <- data[,1]
   time <- data[,1]
   conc <- data[,2]
-  spline <- mlespline.opt(data, K, n)
-  return(mlespline.predict(predict.times, spline$par, K, n))
+  spline <- mlespline.opt(data, K)
+  return(mlespline.predict(predict.times, spline$par, K))
 }
 
 knot.func <- function(x) {
@@ -64,9 +63,10 @@ knot.func <- function(x) {
   return(y)
 }
 
-mlespline.knotfit <- function(par, data, n) {
-  Chat <- mlespline(data, knot.func(par), n)$pred
-  err <- Cobs-Chat
+mlespline.knotfit <- function(par, data) {
+  Chat <- mlespline(data, knot.func(par))$pred
+  Cobs <- data[, 2]
+  err <- Cobs - Chat
   sigma <- sd(err)
   loglik <- dnorm(Cobs, Chat, sigma, log = T)
   return(-1*sum(loglik))

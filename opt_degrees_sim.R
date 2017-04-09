@@ -9,16 +9,16 @@
   library(stringr)
 
 # Set working directory and load functions
-  setwd("C:/Users/hugjh001/Documents/optinterval")
-  #setwd("C:/Users/Jim Hughes/Documents/GitRepos/optinterval")
-  source("spline_functions.R")
+  #setwd("C:/Users/hugjh001/Documents/optinterval")
+  setwd("C:/Users/Jim Hughes/Documents/GitRepos/optinterval")
+  source("spline_functions_ns.R")
   source("pk_data.R")
 
 # Set ggplot2 theme
   theme_bw2 <- theme_set(theme_bw(base_size = 14))
 
 #
-  which.knots <- function(data, degree, max.knots = NULL) {
+  which.knots <- function(data, max.knots = NULL) {
   # Setup environment
     if (is.null(max.knots)) max.knots <- 3
     x <- data[,1]
@@ -34,11 +34,11 @@
       #low.lim <- c(min(x), rep(1, i - 1))
       #upp.lim <- rep(max(x), i)
     # Optimise
-      result <- optim(
+      opt.res <- optim(
         par,  # Initial parameter estimates
         mlespline.knotfit,  # Fitting function
-        method = "L-BFGS-B", lower = min(x), upper = max(x),
-        data = data, n = degree  # Function arguments
+        method = "L-BFGS-B", lower = min(x) + 0.001, upper = max(x),
+        data = data  # Function arguments
       )
     # Collate results
       err[i] <- opt.res$value
