@@ -72,7 +72,7 @@
         par,  # Initial parameter estimates
         error.spline.func,  # Fitting function
         # method = "SANN",
-        method = "L-BFGS-B", lower = min(x), upper = max(x),
+        method = "L-BFGS-B", lower = min(x) + 0.0001, upper = max(x),
         Cobs = y, time = x  # Function arguments
       )
       err[i] <- opt.res$value
@@ -103,9 +103,8 @@
   onecomp <- data.frame(time = sample.times, conc = sample.conc)
 
 # Determine if there is a difference between degrees
-  spline.data <- llply(seq_len(2), function(x) {
-    which.knots(onecomp$time, onecomp$conc, x)
-  })
+  which.knots(onecomp$time, onecomp$conc, 3)
+
 
   spline.to.plot <- function(data, spline) {
     plot.df <- ldply(seq_len(length(spline)), function(n) {

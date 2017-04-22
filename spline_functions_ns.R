@@ -15,7 +15,6 @@ mlespline.opt <- function(data, K) {
   ndata <- data.frame(x = data[,1], y = data[,2])
   lm.mod <- lm(y ~ ns(x, knots = c(K)), data = ndata)
   init.par <- unname(lm.mod$coefficients[c(2:(length(knots) + 2), 1)])
-  browser()
   suppressWarnings(
     optim(
       c(init.par, 1),
