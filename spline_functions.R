@@ -12,10 +12,10 @@ mlespline.fit <- function(par, x, y) {
 }
 
 mlespline.opt <- function(data, K, n) {
-  ndata <- data.frame(x = data[,1], y = data[,2])
+  ndata <- data.frame(x = data[, 1], y = data[, 2])
   lm.mod <- lm(y ~ bs(x, knots = c(K), degree = n), data = ndata)
-  n.comp <- length(K) + n
-  init.par <- unname(pk.modlm$coefficients[c(2:(n.comp + 1), 1)])
+  n.coeff <- length(K) + n
+  init.par <- unname(lm.mod$coefficients[c(2:(n.coeff + 1), 1)])
   suppressWarnings(
     optim(
       c(init.par, 1),
