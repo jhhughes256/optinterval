@@ -50,17 +50,18 @@
   }
 
   multi.mle.sumexp <- function(data, absorp = F, comp = 3) {
-    x <- data[, 1]
-    y <- data[, 2]
+    x <- data[which(data[, 2] != 0), 1]
+    y <- data[which(data[, 2] != 0), 2]
     opt.par <- list(NULL)
     opt.val <- list(NULL)
-    init.par <- unname(lm(log(conc) ~ time, data = data1)$coefficients)[c(2, 1)]
+    init.par <- unname(lm(log(y) ~ x)$coefficients)[c(2, 1)]
     for (i in 1:comp) {
+      ss <- 0.05*(i - 1)
       optres <- optim(
-        rep(init.par, each = i)*rep(seq(0.95, 1.05, length.out = i), 2),
+        rep(init.par, each = i)*rep(seq(1 - ss, 1 + ss, length.out = i), 2),
         mle.sumexp,  # maximum likelihood fitting function
         method = "BFGS",
-        x = data1$time, y = data1$conc, abs = absorp
+        x = x, y = y, abs = absorp
       )
       opt.par[[i]] <- optres$par
       opt.val[i] <- optres$value
@@ -81,14 +82,16 @@
     })
     levels(plotdata$comp) <- paste(levels(plotdata$comp), "exponent(s)")
 
+    ylim <- c(0, 1.1*max(plotdata$cobs))
+    xlim <- c(0, max(plotdata$time))
     plotobj <- NULL
     plotobj <- ggplot(data = plotdata)
     plotobj <- plotobj + ggtitle("Comparison of Number of Exponents Used")
     plotobj <- plotobj + geom_point(aes(x = time, y = cobs))
     plotobj <- plotobj + geom_line(aes(x = time, y = pred), colour = "red")
     plotobj <- plotobj + geom_text(aes(x = median(time), y = max(cobs), label = objv))
-    plotobj <- plotobj + scale_y_continuous("Concentration (mg/mL)\n")
-    plotobj <- plotobj + scale_x_continuous("\nTime after dose (hrs)")
+    plotobj <- plotobj + scale_y_continuous("Concentration (mg/mL)\n", lim = ylim)
+    plotobj <- plotobj + scale_x_continuous("\nTime after dose (hrs)", lim = xlim)
     plotobj <- plotobj + facet_wrap(~comp)
     plotobj
   }
@@ -116,3 +119,5 @@
   with(data2, plot(time, log(conc)))
 
   all.res <- multi.mle.sumexp(data2, comp = 4, absorp = T)
+
+  plot.sumexp(all.res, data2, absorp = T)
