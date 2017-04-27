@@ -54,11 +54,21 @@
     y <- data[which(data[, 2] != 0), 2]
     opt.par <- list(NULL)
     opt.val <- list(NULL)
-    init.par <- unname(lm(log(y) ~ x)$coefficients)[c(2, 1)]
+    lm.par <- unname(lm(log(y) ~ x)$coefficients)[c(2, 1)]
     for (i in 1:comp) {
-      ss <- 0.05*(i - 1)
+      if (i == 1) {
+        init.par <- lm.par
+      } else if (i == 2) {
+        browser()
+        init.par <- rep(lm.par, each = 2)*c(0.9, 1.1)
+      } else {
+        init.par <- c(
+          mean(optres$par[1:(i-1)]), optres$par[1:(i-1)],
+          mean(optres$par[i:(2*i-2)]), optres$par[i:(2*i-2)]
+        )
+      }
       optres <- optim(
-        rep(init.par, each = i)*rep(seq(1 - ss, 1 + ss, length.out = i), 2),
+        init.par,
         mle.sumexp,  # maximum likelihood fitting function
         method = "BFGS",
         x = x, y = y, abs = absorp
