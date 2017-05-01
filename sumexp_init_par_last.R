@@ -1,32 +1,11 @@
-# Working out how to fit to PK data using sum of exponentials
+# Further work on determining initial parameters
 # -----------------------------------------------------------------------------
-# Email from Richard
-# included excel spreadsheet using formulas to fit coefficients of linear
-# equations
-
+# Setup workspace
   library(plyr)
   library(ggplot2)
   theme_bw2 <- theme_set(theme_bw(base_size = 14))
   theme_update(plot.title = element_text(hjust = 0.5))
 
-# Absorption Curve
-  time.samp <- seq(0, 48, by = 2)
-  absdata <- data.frame(
-    time = time.samp,
-    line1 = -0.2*time.samp + 4,
-    line2 = -0.1*time.samp + 4
-  )
-  absdata$sumexp <- exp(absdata$line2) - exp(absdata$line1)
-  with(absdata, plot(time, sumexp))
-
-# 2 Compartment Curve
-  twodata <- data.frame(
-    time = time.samp,
-    line1 = -0.5*time.samp + 6,
-    line2 = -0.05*time.samp + 5
-  )
-  twodata$sumexp <- exp(twodata$line1) + exp(twodata$line2)
-  with(twodata, plot(time, log(sumexp)))
 # -----------------------------------------------------------------------------
 # Setup OFV functions
 # Flexible sum of coefficients function
@@ -49,18 +28,24 @@
     return(-1*sum(loglik))
   }
 
-  multi.mle.sumexp <- function(data, absorp = F, comp = 3) {
+  multi.mle.sumexp <- function(data, absorp = F, nexp = 3) {
     x <- data[which(data[, 2] != 0), 1]
     y <- data[which(data[, 2] != 0), 2]
+    sub.y <- which(y == max(y)):length(y)
     opt.par <- list(NULL)
     opt.val <- list(NULL)
-    lm.par <- unname(lm(log(y) ~ x)$coefficients)[c(2, 1)]
-    for (i in 1:comp) {
+    opt.gra <- list(NULL)
+    opt.con <- list(NULL)
+    lm.par <- unname(lm(log(y[sub.y]) ~ x[sub.y])$coefficients)[c(2, 1)]
+    for (i in 1:nexp) {
       if (i == 1) {
         init.par <- lm.par
       } else if (i == 2) {
-        browser()
-        init.par <- rep(lm.par, each = 2)*c(0.9, 1.1)
+        if (absorp) {
+          init.par <- rep(lm.par, each = 2)*c(0.8, 1.2)
+        } else {
+          init.par <- rep(lm.par, each = 2)*c(0.9, 1.1)
+        }
       } else {
         init.par <- c(
           mean(optres$par[1:(i-1)]), optres$par[1:(i-1)],
@@ -74,23 +59,26 @@
         x = x, y = y, abs = absorp
       )
       opt.par[[i]] <- optres$par
-      opt.val[i] <- optres$value
+      opt.val[[i]] <- optres$value
+      opt.gra[[i]] <- optres$counts
+      opt.con[[i]] <- optres$convergence
     }
-    res <- list(par = opt.par, value = opt.val)
+    res <- list(par = opt.par, value = opt.val, counts = opt.gra,
+      convergence = opt.con)
     res
   }
 
   plot.sumexp <- function(res, data, absorp = F) {
     plotdata <- ldply(res$par, function(x) {
       data.frame(
-        comp = as.factor(length(x)/2),
+        nexp = as.factor(length(x)/2),
         time = data$time,
         cobs = data$conc,
         pred = pred.sumexp(x, data$time, absorp),
         objv = res$value[[length(x)/2]]
       )
     })
-    levels(plotdata$comp) <- paste(levels(plotdata$comp), "exponent(s)")
+    levels(plotdata$nexp) <- paste(levels(plotdata$nexp), "exponent(s)")
     ylim <- c(0, 1.1*max(plotdata$cobs))
     xlim <- c(0, max(plotdata$time))
 
@@ -102,32 +90,78 @@
     plotobj <- plotobj + geom_text(aes(x = median(time), y = max(cobs), label = objv))
     plotobj <- plotobj + scale_y_continuous("Concentration (mg/mL)\n", lim = ylim)
     plotobj <- plotobj + scale_x_continuous("\nTime after dose (hrs)", lim = xlim)
-    plotobj <- plotobj + facet_wrap(~comp)
+    plotobj <- plotobj + facet_wrap(~nexp)
     plotobj
   }
-
 # -----------------------------------------------------------------------------
-# Will require fitting to real data, parameters are slope and intercept
+# Simulate data
+# Absorption Curve
+  time.samp <- seq(0, 48, by = 2)
+  absdata <- data.frame(
+    time = time.samp,
+    line1 = -0.2*time.samp + 4,
+    line2 = -0.1*time.samp + 4
+  )
+  absdata$sumexp <- exp(absdata$line2) - exp(absdata$line1)
+  #with(absdata, plot(time, sumexp))
+
+# 2 Compartment Curve
+  twodata <- data.frame(
+    time = time.samp,
+    line1 = -0.5*time.samp + 6,
+    line2 = -0.05*time.samp + 5
+  )
+  twodata$sumexp <- exp(twodata$line1) + exp(twodata$line2)
+  #with(twodata, plot(time, log(sumexp)))
+# -----------------------------------------------------------------------------
+# Add random error and optimise using rich data
+# Absorption
   err <- 1 + rnorm(n = length(time.samp), mean = 0, sd = 0.3)
   data1 <- data.frame(
     time = time.samp,
-    conc = twodata$sumexp*err
+    conc = absdata$sumexp*err
   )
   with(data1, plot(time, log(conc)))
 
-  all.res <- multi.mle.sumexp(data1, comp = 4)
-  #with(all.res, which(unlist(value) == min(unlist(value))))  # best fit
-  plot.sumexp(all.res, data1)
+  all.res <- multi.mle.sumexp(data1, nexp = 4, absorp = T)
 
-# -----------------------------------------------------------------------------
-# Will require fitting to real data, parameters are slope and intercept
+  plot.sumexp(all.res, data1, absorp = T)
+
+# Two compartment
   err <- 1 + rnorm(n = length(time.samp), mean = 0, sd = 0.3)
   data2 <- data.frame(
     time = time.samp,
-    conc = absdata$sumexp*err
+    conc = twodata$sumexp*err
   )
   with(data2, plot(time, log(conc)))
 
-  all.res <- multi.mle.sumexp(data2, comp = 4, absorp = T)
+  all.res <- multi.mle.sumexp(data2, nexp = 4)
+  #with(all.res, which(unlist(value) == min(unlist(value))))  # best fit
+  plot.sumexp(all.res, data2)
 
-  plot.sumexp(all.res, data2, absorp = T)
+# -----------------------------------------------------------------------------
+# Add random error and optimise using sparse
+  sub.time <- c(1:5, (1:4+3)*2-1, (1:3+3)*4-1)
+# Absorption sub-data
+  err <- 1 + rnorm(n = length(sub.time), mean = 0, sd = 0.3)
+  data3 <- data.frame(
+    time = time.samp[sub.time],
+    conc = absdata$sumexp[sub.time]*err
+  )
+  with(data3, plot(time, log(conc)))
+
+  all.res <- multi.mle.sumexp(data3, nexp = 4, absorp = T)
+
+  plot.sumexp(all.res, data3, absorp = T)
+
+# Two compartment sub-data
+  err <- 1 + rnorm(n = length(sub.time), mean = 0, sd = 0.3)
+  data4 <- data.frame(
+    time = time.samp[sub.time],
+    conc = twodata$sumexp[sub.time]*err
+  )
+  with(data4, plot(time, log(conc)))
+
+  all.res <- multi.mle.sumexp(data4, nexp = 4)
+
+  plot.sumexp(all.res, data4)
