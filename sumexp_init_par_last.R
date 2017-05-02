@@ -19,7 +19,7 @@
     return(yhat)
   }
 
-  # Flexible maximum likelihood estimmation
+# Flexible maximum likelihood estimmation
   mle.sumexp <- function(par, x, y, abs = F) {
     yhat <- pred.sumexp(par, x, abs)
     err <- y - yhat
@@ -36,35 +36,47 @@
     opt.val <- list(NULL)
     opt.gra <- list(NULL)
     opt.con <- list(NULL)
+    opt.mes <- list(NULL)
     lm.par <- unname(lm(log(y[sub.y]) ~ x[sub.y])$coefficients)[c(2, 1)]
     for (i in 1:nexp) {
       if (i == 1) {
         init.par <- lm.par
       } else if (i == 2) {
         if (absorp) {
-          init.par <- rep(lm.par, each = 2)*c(0.8, 1.2)
+          init.par <- c(lm.par[1]*c(0.8, 1.2), rep(lm.par[2], 2))
         } else {
-          init.par <- rep(lm.par, each = 2)*c(0.9, 1.1)
+          init.par <- c(lm.par[1]*c(0.8, 1.2), lm.par[2]*c(0.9, 1.1))
         }
       } else {
-        init.par <- c(
-          mean(optres$par[1:(i-1)]), optres$par[1:(i-1)],
-          mean(optres$par[i:(2*i-2)]), optres$par[i:(2*i-2)]
-        )
+        if (absorp) {
+          init.par <- c(
+            mean(optres$par[1:(i-1)]), optres$par[1:(i-1)],
+            mean(optres$par[i:(2*i-2)])/2, optres$par[i:(2*i-2)]
+          )
+        } else {
+          init.par <- c(
+            mean(optres$par[1:(i-1)]), optres$par[1:(i-1)],
+            mean(optres$par[i:(2*i-2)]), optres$par[i:(2*i-2)]
+          )
+        }
       }
       optres <- optim(
         init.par,
         mle.sumexp,  # maximum likelihood fitting function
-        method = "BFGS",
+        method = "L-BFGS-B",
+        lower = c(rep(-Inf, i), rep(-1/10^10, i)),
+        upper = c(rep(1/10^10, i), rep(Inf, i)),
         x = x, y = y, abs = absorp
       )
       opt.par[[i]] <- optres$par
       opt.val[[i]] <- optres$value
       opt.gra[[i]] <- optres$counts
       opt.con[[i]] <- optres$convergence
+      opt.mes[[i]] <- ifelse(is.null(optres$message),
+        "NULL", optres$message)
     }
     res <- list(par = opt.par, value = opt.val, counts = opt.gra,
-      convergence = opt.con)
+      convergence = opt.con, message = opt.mes)
     res
   }
 
@@ -143,7 +155,7 @@
 # Add random error and optimise using sparse
   sub.time <- c(1:5, (1:4+3)*2-1, (1:3+3)*4-1)
 # Absorption sub-data
-  err <- 1 + rnorm(n = length(sub.time), mean = 0, sd = 0.3)
+  err <- 1 + rnorm(n = length(sub.time), mean = 0, sd = 0.2)
   data3 <- data.frame(
     time = time.samp[sub.time],
     conc = absdata$sumexp[sub.time]*err
@@ -155,7 +167,7 @@
   plot.sumexp(all.res, data3, absorp = T)
 
 # Two compartment sub-data
-  err <- 1 + rnorm(n = length(sub.time), mean = 0, sd = 0.3)
+  err <- 1 + rnorm(n = length(sub.time), mean = 0, sd = 0.2)
   data4 <- data.frame(
     time = time.samp[sub.time],
     conc = twodata$sumexp[sub.time]*err
