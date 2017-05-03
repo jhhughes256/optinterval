@@ -1,6 +1,6 @@
-#Some notes on achieving constant numerical integration error
+# Some notes on achieving constant numerical integration error
 
-  time <- c(0,0.25,0.5,1,2,4,8,12,24)
+  time <- seq(0,120,by=10)
 
   comp1abs <- function(time)
   {
@@ -27,21 +27,14 @@
   plot(abs(secondd)~time, data=testdf)
 
   #delta t to get constant integration error
-  k <- 0.083
+  k <- 0.002
   testdf$deltat <- (1/(k*abs(testdf$secondd)))^(1/3)
-
-  nobs <- length(time)-1
-  ldply(seq_len(nobs), function(i) {
-    t <- time[c(i,i+1)]
-    abs.err <- -(t[2] - t[1])^3*testdf$secondd[i+1]/12
-    c(a = t[1],
-      b = t[2],
-      abs = abs(abs.err)
-    )
-  })
 
   testdf
 
-  #deltat means that for for the preceding time-interval and this error, you could have samples every deltat min?
+# deltat means that for for the preceding time-interval and this error
+# you could have samples every deltat min?
 
-  #needs to be framed as: given x pk samples what interval apart should they be?  Some sort of iterative process that minimises the intergration error?  Needs a spline function to estimate derivatives at any time based on observed data?
+# needs to be framed as: given x pk samples what interval apart should they be?
+# Some sort of iterative process that minimises the intergration error?
+# Need spline function to estimate derivatives at times based on observed data?
