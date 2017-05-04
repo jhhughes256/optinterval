@@ -58,7 +58,7 @@
     times <- c(tmin, par, tmax)  # combine variable and fixed times
     deltat <- diff(times)
     secd <- pred.sumexp(exp.par, times, absorp, 2)  # d = 2 (second derivative)
-    err <- abs(deltat^3*secd[-1]/12)  # trapezoidal error function
+    err <- abs(deltat^3*secd[-length(secd)]/12)  # trapezoidal error function
   # Might need to play around with different methods for error sum
     sum(err)
   }
