@@ -64,8 +64,8 @@
         init.par,
         mle.sumexp,  # maximum likelihood fitting function
         method = "L-BFGS-B",
-        lower = c(rep(-Inf, i), rep(-1/10^10, i)),
-        upper = c(rep(1/10^10, i), rep(Inf, i)),
+        lower = c(rep(-Inf, i), rep(1/10^10, i)),
+        upper = c(rep(-1/10^10, i), rep(Inf, i)),
         x = x, y = y, abs = absorp
       )
       opt.par[[i]] <- optres$par

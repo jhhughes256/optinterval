@@ -42,30 +42,32 @@
     return(-1*sum(loglik))
   }
 
-  multi.mle.sumexp <- function(data, absorp = F, nexp = 3) {
+  multi.mle.sumexp <- function(data, oral = F, nexp = 3) {
     x <- data[which(data[, 2] != 0), 1]
     y <- data[which(data[, 2] != 0), 2]
-    sub.y <- which(y == max(y)):length(y)
     opt.par <- list(NULL)
     opt.val <- list(NULL)
     opt.gra <- list(NULL)
     opt.con <- list(NULL)
     opt.mes <- list(NULL)
-    lm.par <- lm(log(y[sub.y]) ~ x[sub.y])$coefficients)
+    sub.y <- which(y == max(y)):length(y)
+    lm.par <- unname(lm(log(y[sub.y]) ~ x[sub.y])$coefficients)
     for (i in 1:nexp) {
       if (i == 1) {
-        init.par <- lm.par
+        init.par <- c(lm.par[2], exp(lm.par[1]))
       } else if (i == 2) {
-        if (absorp) {
-          init.par <- c(lm.par[1]*c(0.8, 1.2), rep(lm.par[2], 2))
+        browser()
+        if (oral) {
+          init.par <- c(lm.par[2]*c(0.8, 1.2), exp(lm.par[1]*c(1, 1.2))[-i])
         } else {
-          init.par <- c(lm.par[1]*c(0.8, 1.2), lm.par[2]*c(0.9, 1.1))
+          init.par <- c(lm.par[2]*c(0.8, 1.2), exp(lm.par[1]*c(1, 1.2)))
         }
       } else {
-        if (absorp) {
+        seq(1-(i-(oral+1))*0.05, 1+(i-(oral+1))*0.05, length.out = (i-oral))
+        if (oral) {
           init.par <- c(
             mean(optres$par[1:(i-1)]), optres$par[1:(i-1)],
-            mean(optres$par[i:(2*i-2)])/2, optres$par[i:(2*i-2)]
+            sum(optres$par[i:(2*i-3)])/(i-2)
           )
         } else {
           init.par <- c(
@@ -78,8 +80,8 @@
         init.par,
         mle.sumexp,  # maximum likelihood fitting function
         method = "L-BFGS-B",
-        lower = c(rep(-Inf, i), rep(-1/10^10, i)),
-        upper = c(rep(1/10^10, i), rep(Inf, i)),
+        lower = c(rep(-Inf, i), rep(1/10^10, i)),
+        upper = c(rep(-1/10^10, i), rep(Inf, i)),
         x = x, y = y
       )
       opt.par[[i]] <- optres$par
@@ -94,13 +96,13 @@
     res
   }
 
-  plot.sumexp <- function(res, data, absorp = F) {
+  plot.sumexp <- function(res, data) {
     plotdata <- ldply(res$par, function(x) {
       data.frame(
         nexp = as.factor(length(x)/2),
         time = data$time,
         cobs = data$conc,
-        pred = pred.sumexp(x, data$time, absorp),
+        pred = pred.sumexp(x, data$time, 0),
         objv = res$value[[length(x)/2]]
       )
     })
@@ -149,9 +151,9 @@
   )
   with(data1, plot(time, log(conc)))
 
-  all.res <- multi.mle.sumexp(data1, nexp = 4, absorp = T)
+  all.res <- multi.mle.sumexp(data1, nexp = 4, oral = T)
 
-  plot.sumexp(all.res, data1, absorp = T)
+  plot.sumexp(all.res, data1, oral = T)
 
 # Two compartment
   err <- 1 + rnorm(n = length(time.samp), mean = 0, sd = 0.3)
@@ -164,30 +166,3 @@
   all.res <- multi.mle.sumexp(data2, nexp = 4)
   #with(all.res, which(unlist(value) == min(unlist(value))))  # best fit
   plot.sumexp(all.res, data2)
-
-# -----------------------------------------------------------------------------
-# Add random error and optimise using sparse
-  sub.time <- c(1:5, (1:4+3)*2-1, (1:3+3)*4-1)
-# Absorption sub-data
-  err <- 1 + rnorm(n = length(sub.time), mean = 0, sd = 0.2)
-  data3 <- data.frame(
-    time = time.samp[sub.time],
-    conc = absdata$sumexp[sub.time]*err
-  )
-  with(data3, plot(time, log(conc)))
-
-  all.res <- multi.mle.sumexp(data3, nexp = 4, absorp = T)
-
-  plot.sumexp(all.res, data3, absorp = T)
-
-# Two compartment sub-data
-  err <- 1 + rnorm(n = length(sub.time), mean = 0, sd = 0.2)
-  data4 <- data.frame(
-    time = time.samp[sub.time],
-    conc = twodata$sumexp[sub.time]*err
-  )
-  with(data4, plot(time, log(conc)))
-
-  all.res <- multi.mle.sumexp(data4, nexp = 4)
-
-  plot.sumexp(all.res, data4)
