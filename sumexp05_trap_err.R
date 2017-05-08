@@ -49,7 +49,7 @@
     )
   # Useful values to return are $par
   # $value is a sum of errors, errors would be more interesting when separated
-    return(optres)
+    return(res)
   }
 
 # Can either determine second derivative at parameter times, or choose the

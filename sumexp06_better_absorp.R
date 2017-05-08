@@ -63,7 +63,7 @@
           init.par <- c(lm.par[2]*c(0.8, 1.2), exp(lm.par[1]*c(1, 1.2)))
         }
       } else {
-        seq(1-(i-(oral+1))*0.05, 1+(i-(oral+1))*0.05, length.out = (i-oral))
+        seq(1-(i-(oral+1))*0.05, 1+(i-(oral+1))*0.05, length.out = i-oral-1)
         if (oral) {
           init.par <- c(
             mean(optres$par[1:(i-1)]), optres$par[1:(i-1)],
