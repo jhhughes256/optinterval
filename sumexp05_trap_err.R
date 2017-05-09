@@ -74,3 +74,4 @@
 
 # Optimise
   optinterval(time.seq, c(-0.5, -0.05, 6, 5), absorp = F)
+  optinterval(time.seq, c(-0.1, -0.2, 4, 4), absorp = T)
