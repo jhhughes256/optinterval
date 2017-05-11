@@ -51,10 +51,10 @@
           init.par <- c(lm.par[2]*c(0.8, 1.2), lm.par[1]*c(1, 1.2))
         }
       } else {
-        s <- seq(1-(i-(oral+1))*0.05, 1+(i-(oral+1))*0.05, length.out = i-oral)
         if (oral) {
+          s <- seq(1-(i-(oral+1))*0.05, 1+(i-(oral+1))*0.05, length.out = i-oral)
           init.par <- c(
-            mean(optres$par[1:(i-2)]), optres$par[1:(i-1)],
+            mean(optres$par[1:(i-1)]), optres$par[1:(i-1)],
             log(sum(exp(optres$par[i:(2*i-3)]))/(i-1)*s)
           )
         } else {
@@ -86,6 +86,21 @@
     res
   }
 
+# Chi-squared difference test
+# Takes a list of optim results and gives the best optim result
+  chisq.sumexp <- function(opt) {
+    i <- 1
+    for (j in 2:length(opt$par)) {
+      degf <- length(opt$par[[j]]) - length(opt$par[[i]])
+      x <- opt$value[[i]] - opt$value[[j]]
+      p <- pchisq(x, degf, lower.tail = F)
+      if (p < 0.01) {
+        i <- i + 1
+      }
+    }
+    return(sapply(opt, function(x) x[i]))
+  }
+
 # Trapezoidal error function for interval optimisation
   err.interv <- function(par, exp.par, tmin, tmax, theta) {
     times <- c(tmin, par, tmax)
@@ -114,7 +129,7 @@
 
     res <- optim(
       init.par,
-      err.trap,
+      err.interv,
       method = "L-BFGS-B", control = c(maxit = 500),
       lower = xmin, upper = xmax,
       exp.par = fit.par, tmin = xmin, tmax = xmax, theta = theta
