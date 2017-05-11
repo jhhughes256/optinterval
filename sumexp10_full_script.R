@@ -56,6 +56,20 @@
 # Workflow for functions
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 # First function that runs is
-  optim.res1 <- optim.sumexp(data1, oral = T, nexp = 4)
+  list.sumexp1 <- optim.sumexp(data1, oral = T, nexp = 4)
 
-# Then
+# Then we determine the best model using chi-squares
+  best.sumexp1 <- chisq.sumexp(list.sumexp1)
+
+# Now we use these optim results along with our time sequence
+# Originally 49 samples were taken (so many!), but now we only want to use 12
+  nobs <- 12
+  tlast <- 24
+  time.seq <- c(0, exp(seq(-2.5, 0, length.out = nobs))*tlast)
+  interv1 <- optim.interv(time.seq, best.sumexp1$par)
+
+# Lastly we need to provide the information that the output
+  output <- list(
+    sumexp.par = best.sumexp1$par,
+    time.interv = c(0, interv1$par, tlast)
+  )
