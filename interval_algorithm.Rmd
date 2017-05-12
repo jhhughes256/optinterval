@@ -1,0 +1,63 @@
+---
+title: "Interval Optimisation Algorithm"
+output:
+  html_notebook: default
+  html_document: default
+  word_document: default
+---
+_An explanation of the processes used to minimise associated with the time_ 
+_intervals used in the determination of AUC using trapezoidal integration_
+
+# --------------------------------------------------------------------------------
+### Trapezoidal Error
+When approximating the definite integral (aka AUC) using trapezoidal 
+integration, the number and spacing of time intervals directly impact the error
+of this approximation. This error is represented by:
+$$\epsilon=\int_a^{b}f(x)dx - \frac{b-a}{2}[f(a) + f(b)]$$
+This can be simplified to:
+$$\epsilon=\frac{(b-a)^3}{12}f''(\theta) \space \space \space \space{a \le \theta \le b}$$
+This is achieved using integration by parts and the proof is in the link below.
+Link: http://www.math.ucsd.edu/~ebender/20B/77_Trap.pdf 
+
+Given a number of time intervals, it is possible to find the optimum spacing 
+for these times to minimise the error associated with trapezoidal integration.
+
+However, while the variable b
+
+### Why Sum of Exponentials?
+Basic pharmacokinetic models are effectively described using the sum of one or
+more exponential terms. For example a one-compartment pharmacokinetic model is 
+described using:
+$$C=C_0e^{-\frac{CL}{Vd}t}$$
+If we let $-\frac{CL}{Vd}=m$ and $c=lny_0$ then this can be written more simply
+as:
+$$y=e^ce^{mx}$$
+$$y=e^{mx+c}$$
+This matches what is seen when viewing a one-compartment model using a 
+log-scale for the y-axis.
+``` {r 1comp.plot.example}
+  examplesumexp.par <- list(CL = 10, Vd = 20, C0 = 100, t = 1:24)
+  examplesumexp.par$C <- with(examplesumexp.par, C0*exp(-(CL/Vd)*t))
+  with(examplesumexp.par, plot(t, log(C)))
+```
+By using $m$ and $c$ as parameters using the `optim` function the data can be
+described using these equations.
+
+``` {r sim.data, echo = F}
+# Absorption Curve
+  time.samp <- seq(0, 24, by = 2)
+  absdata <- data.frame(
+    time = time.samp,
+    line1 = -0.2*time.samp + 4,
+    line2 = -0.1*time.samp + 4
+  )
+  data1$sumexp <- exp(absdata$line2) - exp(absdata$line1)
+  
+# 2 compartment curve
+  twodata <- data.frame(
+    time = time.samp,
+    line1 = -0.5*time.samp + 6,
+    line2 = -0.05*time.samp + 5
+  )
+  data2$sumexp <- exp(twodata$line1) + exp(twodata$line2)
+```
