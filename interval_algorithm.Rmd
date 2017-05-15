@@ -1,7 +1,6 @@
 ---
 title: "Interval Optimisation Algorithm"
 output:
-  html_notebook: default
   html_document: default
   word_document: default
 ---
@@ -22,7 +21,9 @@ Link: http://www.math.ucsd.edu/~ebender/20B/77_Trap.pdf
 Given a number of time intervals, it is possible to find the optimum spacing 
 for these times to minimise the error associated with trapezoidal integration.
 
-However, while the variable b
+To optimise the time intervals, $f''(/theta)$ must be fixed. This requires a 
+function describing the curve. A solution for this is the use of sum of 
+exponentials.
 
 ### Why Sum of Exponentials?
 Basic pharmacokinetic models are effectively described using the sum of one or
@@ -36,28 +37,62 @@ $$y=e^{mx+c}$$
 This matches what is seen when viewing a one-compartment model using a 
 log-scale for the y-axis.
 ``` {r 1comp.plot.example}
-  examplesumexp.par <- list(CL = 10, Vd = 20, C0 = 100, t = 1:24)
-  examplesumexp.par$C <- with(examplesumexp.par, C0*exp(-(CL/Vd)*t))
-  with(examplesumexp.par, plot(t, log(C)))
+  examplesumexp.par <- list(CL = 10, Vd = 20, C0 = 100, time = 1:24)
+  examplesumexp.par$concentration <- with(examplesumexp.par, C0*exp(-(CL/Vd)*time))
+  with(examplesumexp.par, plot(time, log(concentration)))
 ```
+
 By using $m$ and $c$ as parameters using the `optim` function the data can be
 described using these equations.
+
+### The Sum of Exponentials Algorithm
+First an algorithm that can calculate the dependent variable given a group of 
+parameters. 
+
+The function below is designed to take `x`, the parameters which describe the
+sum of exponentials, `t` the time points to be predicted and `d` to calculate
+the derivative (specifcally for determining the second derviative to determine
+trapezoidal error).
+
+
+``` {r pred.sumexp}
+# Sum of exponentials predicted concentrations function
+  pred.sumexp <- function(x, t, d = 0) {
+  # Record whether there is an odd or even number of parameters
+    l <- length(x)
+    a <- ifelse(l %% 2 == 0, 0, 1)
+  # Determine how many exponentials the parameters describe
+    n <- ceiling(l/2)
+  # Loop for number of exponentials
+  # Add exponentials together as described by parameters
+    for (i in 1:n) {
+      if (i == 1) y <- x[i]^d*exp(x[i]*t + x[n+i])
+      else if (i != n | a == 0) y <- y + x[i]^d*exp(x[i]*t + x[n+i])
+    # If odd number of parameters (and last set of parameters) make absorption curve
+      else if (a == 1) y <- y - x[i]^d*exp(x[i]*t)*sum(exp(x[(n+1):(2*n-1)]))
+    }
+    return(y)
+  }
+```
+
+The parameters used to describe the sum of exponentials have the following 
+rules:
 
 ``` {r sim.data, echo = F}
 # Absorption Curve
   time.samp <- seq(0, 24, by = 2)
-  absdata <- data.frame(
+  data1 <- data.frame(
     time = time.samp,
     line1 = -0.2*time.samp + 4,
     line2 = -0.1*time.samp + 4
   )
-  data1$sumexp <- exp(absdata$line2) - exp(absdata$line1)
+  data1$sumexp <- exp(data1$line2) - exp(data1$line1)
   
 # 2 compartment curve
-  twodata <- data.frame(
+  data2 <- data.frame(
     time = time.samp,
     line1 = -0.5*time.samp + 6,
     line2 = -0.05*time.samp + 5
   )
-  data2$sumexp <- exp(twodata$line1) + exp(twodata$line2)
+  data2$sumexp <- exp(data2$line1) + exp(data2$line2)
 ```
