@@ -46,14 +46,13 @@ By using $m$ and $c$ as parameters using the `optim` function the data can be
 described using these equations.
 
 ### The Sum of Exponentials Algorithm
-First an algorithm that can calculate the dependent variable given a group of 
-parameters. 
+A key part of the algorithm is a function that can calculate the dependent
+variable given a group of parameters. 
 
 The function below is designed to take `x`, the parameters which describe the
 sum of exponentials, `t` the time points to be predicted and `d` to calculate
 the derivative (specifcally for determining the second derviative to determine
 trapezoidal error).
-
 
 ``` {r pred.sumexp}
 # Sum of exponentials predicted concentrations function
@@ -75,8 +74,112 @@ trapezoidal error).
   }
 ```
 
-The parameters used to describe the sum of exponentials have the following 
-rules:
+``` {r example.parameters, echo = F}
+  list(
+    bolus = c(slope1 = -0.5, slope2 = -0.05, int1 = 6, int2 = 5),
+    absorp = c(slope1 = -0.1, slope2 = -0.2, int1 = 4)
+  )
+```
+
+Parameters consist of two sets of numbers; the slope (`m`) parameters and the
+intercept (`c`) parameters. It is important to note that `c` is the 
+log-transformed intercept, so when creating a sum of intercepts it must be 
+transformed back. 
+
+The number of `m` parameters represent the number of exponentials in the sum.
+The number of `c` parameters contain the information required to determine 
+whether the sum of exponentials is for predicting concentrations of an iv 
+bolus curve or an absorption curve. An even number implies an iv bolus, an odd
+number implies absorption. One less intercept is required for absorption, as 
+the sum of the intercepts of the positive exponentials sum to the intercept of
+the negative exponential.
+
+The `d` parameter (seen as a multiplier to the exponentials; `m^d`) simply 
+determines the `d`th derivative for the sum of exponentials described by the
+parameters. When `d = 0` these terms are equal to 1 and do not affect the 
+exponentials
+
+### Optimisation of Sum of Exponential Parameters
+The first step of the algorithm is to determine the sum of exponentials that 
+best describes the data. This function takes the `data` as input, a logical
+statement of whether or not the data is for an `oral` drug and the maximum 
+number of exponentials `nexp` that the function will try to optimise. 
+
+``` {r optim.sumexp}
+# Fit sum of exponentials to curve for different numbers of exponentials
+  optim.sumexp <- function(data, oral = F, nexp = 3) {
+  # Collate data and ready the variables
+    x <- data[which(data[, 2] != 0), 1]
+    y <- data[which(data[, 2] != 0), 2]
+    opt.par <- list(NULL)
+    opt.val <- list(NULL)
+    opt.gra <- list(NULL)
+    opt.con <- list(NULL)
+    opt.mes <- list(NULL)
+  # Determine the exponential curve that describes the data
+  # Specifically the data after the Cmax
+  # This determines the initial parameters for optimisation
+    sub.y <- which(y == max(y)):length(y)
+    lm.par <- unname(lm(log(y[sub.y]) ~ x[sub.y])$coefficients)
+  # Loop for maximum number of exponentials
+    for (i in 1:nexp) {
+    # For the first two loops lm.par is used to determine initial parameters
+      if (i == 1) {
+        init.par <- c(lm.par[2], lm.par[1])
+      } else if (i == 2) {
+        if (oral) {
+          init.par <- c(lm.par[2]*c(0.8, 1.2), lm.par[1])
+        } else {
+          init.par <- c(lm.par[2]*c(0.8, 1.2), lm.par[1]*c(1, 1.2))
+        }
+      } else {
+      # Three loops and onwards, the previous final estimates are used
+        if (oral) {
+        # For oral the mean of the slope parameter is used
+        # For the intercept parameter the sum is split up and separated by 10%
+          s <- seq(1-(i-(oral+1))*0.05, 1+(i-(oral+1))*0.05, length.out = i-oral)
+          init.par <- c(
+            mean(optres$par[1:(i-1)]), optres$par[1:(i-1)],
+            log(sum(exp(optres$par[i:(2*i-3)]))/(i-1)*s)
+          )
+        } else {
+        # For iv bolus the mean of the slope and intercept parameter is used
+          init.par <- c(
+            mean(optres$par[1:(i-1)]), optres$par[1:(i-1)],
+            mean(optres$par[i:(2*i-2)]), optres$par[i:(2*i-2)]
+          )
+        }
+      }
+    # For each number of exponentials 
+      optres <- optim(
+        init.par,
+        function(par, x, y) {
+          yhat <- pred.sumexp(par, x)
+          err <- y - yhat
+          sigma <- sd(err)
+          loglik <- dnorm(y, yhat, sigma, log = T)
+          return(-1*sum(loglik))
+        },
+        method = "L-BFGS-B",
+        lower = rep(-Inf, i),
+        upper = c(rep(-1/10^10, i), rep(Inf, i)),
+        control = list(maxit = 500),
+        x = x, y = y
+      )
+      opt.par[[i]] <- optres$par
+      opt.val[[i]] <- optres$value
+      opt.gra[[i]] <- optres$counts
+      opt.con[[i]] <- optres$convergence
+      opt.mes[[i]] <- ifelse(is.null(optres$message),
+        "NULL", optres$message)
+    }
+
+    res <- list(par = opt.par, value = opt.val, counts = opt.gra,
+      convergence = opt.con, message = opt.mes)
+    res
+  }
+```
+
 
 ``` {r sim.data, echo = F}
 # Absorption Curve
