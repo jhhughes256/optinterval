@@ -150,7 +150,8 @@ number of exponentials `nexp` that the function will try to optimise.
           )
         }
       }
-    # For each number of exponentials 
+    # For each number of exponentials optimise the sum of exponential parameters
+    # slopes have upper bound of ~0 as all curves will be exponential decay
       optres <- optim(
         init.par,
         function(par, x, y) {
@@ -166,6 +167,7 @@ number of exponentials `nexp` that the function will try to optimise.
         control = list(maxit = 500),
         x = x, y = y
       )
+    # record values
       opt.par[[i]] <- optres$par
       opt.val[[i]] <- optres$value
       opt.gra[[i]] <- optres$counts
