@@ -23,7 +23,7 @@
 # Simulate data
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 # Absorption Curve
-  time.samp <- seq(0, 48, by = 1)
+  time.samp <- seq(0, 48, by = 2)
   absdata <- data.frame(
     time = time.samp,
     line1 = -0.2*time.samp + 4,

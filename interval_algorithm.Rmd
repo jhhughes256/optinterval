@@ -2,12 +2,45 @@
 title: "Interval Optimisation Algorithm"
 output:
   html_document: default
+  html_notebook: default
   word_document: default
 ---
 _An explanation of the processes used to minimise associated with the time_ 
 _intervals used in the determination of AUC using trapezoidal integration_
 
 # --------------------------------------------------------------------------------
+``` {r sim.data, echo = F}
+# Absorption Curve
+  time.samp <- seq(0, 48, by = 2)
+  absdata <- data.frame(
+    time = time.samp,
+    line1 = -0.2*time.samp + 4,
+    line2 = -0.1*time.samp + 4
+  )
+  absdata$sumexp <- exp(absdata$line2) - exp(absdata$line1)
+  #with(absdata, plot(time, sumexp))
+
+# 2 Compartment Curve
+  twodata <- data.frame(
+    time = time.samp,
+    line1 = -0.5*time.samp + 6,
+    line2 = -0.05*time.samp + 5
+  )
+  twodata$sumexp <- exp(twodata$line1) + exp(twodata$line2)
+  #with(twodata, plot(time, log(sumexp)))
+
+# Create datasets
+  err <- 1 + rnorm(n = length(time.samp), mean = 0, sd = 0.3)
+  data1 <- data.frame(
+    time = time.samp,
+    conc = absdata$sumexp#*err
+  )
+  err <- 1 + rnorm(n = length(time.samp), mean = 0, sd = 0.3)
+  data2 <- data.frame(
+    time = time.samp,
+    conc = twodata$sumexp#*err
+  )
+```
 ### Trapezoidal Error
 When approximating the definite integral (aka AUC) using trapezoidal 
 integration, the number and spacing of time intervals directly impact the error
@@ -81,26 +114,41 @@ trapezoidal error).
   )
 ```
 
-Parameters consist of two sets of numbers; the slope (`m`) parameters and the
-intercept (`c`) parameters. It is important to note that `c` is the 
+Parameters consist of two sets of numbers; the slope $m$ parameters and the
+intercept $c$ parameters. It is important to note that $c$ is the 
 log-transformed intercept, so when creating a sum of intercepts it must be 
 transformed back. 
 
-The number of `m` parameters represent the number of exponentials in the sum.
-The number of `c` parameters contain the information required to determine 
+The number of $m$ parameters represent the number of exponentials in the sum.
+The number of $c$ parameters contain the information required to determine 
 whether the sum of exponentials is for predicting concentrations of an iv 
 bolus curve or an absorption curve. An even number implies an iv bolus, an odd
 number implies absorption. One less intercept is required for absorption, as 
 the sum of the intercepts of the positive exponentials sum to the intercept of
 the negative exponential.
 
-The `d` parameter (seen as a multiplier to the exponentials; `m^d`) simply 
-determines the `d`th derivative for the sum of exponentials described by the
-parameters. When `d = 0` these terms are equal to 1 and do not affect the 
+The $d$ parameter (seen as a multiplier to the exponentials; $m^d$) simply 
+determines the $d$th derivative for the sum of exponentials described by the
+parameters. When $d$ these terms are equal to 1 and do not affect the 
 exponentials
 
 ### Optimisation of Sum of Exponential Parameters
-The first step of the algorithm is to determine the sum of exponentials that 
+The function that is used to optimise the sum of exponential uses maximum
+likelihood estimation. Final parameter from optim is removed; this is sigma.
+Sigma is a parameter so that it is minimised, but has boundaries so that it 
+doesn't reach zero.
+
+``` {r mle.sumexp}
+# Maximum likelihood estimation function for parameter optimisation
+  mle.sumexp <- function(par, x, y) {
+    yhat <- pred.sumexp(par, x)
+    sigma <- 0.01
+    loglik <- dnorm(y, yhat, yhat*sigma, log = T)
+    return(-1*sum(loglik))
+  }
+```
+
+But the first step of the algorithm is to determine the sum of exponentials that 
 best describes the data. This function takes the `data` as input, a logical
 statement of whether or not the data is for an `oral` drug and the maximum 
 number of exponentials `nexp` that the function will try to optimise. 
@@ -108,7 +156,7 @@ number of exponentials `nexp` that the function will try to optimise.
 ``` {r optim.sumexp}
 # Fit sum of exponentials to curve for different numbers of exponentials
   optim.sumexp <- function(data, oral = F, nexp = 3) {
-  # Collate data and ready the variables
+  # Collate data and ready final objects
     x <- data[which(data[, 2] != 0), 1]
     y <- data[which(data[, 2] != 0), 2]
     opt.par <- list(NULL)
@@ -150,24 +198,20 @@ number of exponentials `nexp` that the function will try to optimise.
           )
         }
       }
+      browser()
     # For each number of exponentials optimise the sum of exponential parameters
     # slopes have upper bound of ~0 as all curves will be exponential decay
+    # sigma has lower bound of 0.0001, as sigma != 0
       optres <- optim(
-        init.par,
-        function(par, x, y) {
-          yhat <- pred.sumexp(par, x)
-          err <- y - yhat
-          sigma <- sd(err)
-          loglik <- dnorm(y, yhat, sigma, log = T)
-          return(-1*sum(loglik))
-        },
+        init.par,  # Sigma parameter added to init.par for optimisation
+        mle.sumexp,  # maximum likelihood fitting function
         method = "L-BFGS-B",
         lower = rep(-Inf, i),
         upper = c(rep(-1/10^10, i), rep(Inf, i)),
         control = list(maxit = 500),
         x = x, y = y
       )
-    # record values
+    # record values, while removing sigma
       opt.par[[i]] <- optres$par
       opt.val[[i]] <- optres$value
       opt.gra[[i]] <- optres$counts
@@ -182,22 +226,56 @@ number of exponentials `nexp` that the function will try to optimise.
   }
 ```
 
+The biggest limitation with optimising the sum of exponential parameters is the
+initial parameters that are used. This is certainly an area that can be 
+improved, however improvements are not always easily noticable.
 
-``` {r sim.data, echo = F}
-# Absorption Curve
-  time.samp <- seq(0, 24, by = 2)
-  data1 <- data.frame(
-    time = time.samp,
-    line1 = -0.2*time.samp + 4,
-    line2 = -0.1*time.samp + 4
+This function produces the following output when used on oral drug data:
+
+``` {r example.optim, echo = F}
+  suppressWarnings(print(
+    temp <- optim.sumexp(data2, oral = F)
+  ))
+```
+
+`par` is the sum of exponential parameters
+
+`value` is the objective function value from using mle
+
+`counts` is the number of iterations of the function and gradient requred to
+optimise
+
+`convergence` is an error code of whether or not the convergence was successful
+
+`message` gives information on the convergence
+
+### Selecting the Number of Exponentials
+Once the best parameters are determined for the sets of exponentials of 
+interest, it is time to determine which sum of exponentials is best. As these
+are effectively nested models, a chi-squared test has been chosen for model 
+selection.
+
+``` {r chisq.sumexp}
+# Chi-squared difference test
+# Takes a list of optim results and gives the best optim result
+# i designates the best model
+# j designates the model to compare to the best model
+  chisq.sumexp <- function(opt) {
+    i <- 1
+    for (j in 2:length(opt$par)) {
+      degf <- length(opt$par[[j]]) - length(opt$par[[i]])
+      x <- opt$value[[i]] - opt$value[[j]]
+      p <- pchisq(x, degf, lower.tail = F)
+      if (p < 0.01) {
+        i <- i + 1
+      }
+    }
+    return(sapply(opt, function(x) x[i]))
+  }
+```
+
+``` {r example.chisq, echo = F}
+  print(
+    chisq.sumexp(temp)
   )
-  data1$sumexp <- exp(data1$line2) - exp(data1$line1)
-  
-# 2 compartment curve
-  data2 <- data.frame(
-    time = time.samp,
-    line1 = -0.5*time.samp + 6,
-    line2 = -0.05*time.samp + 5
-  )
-  data2$sumexp <- exp(data2$line1) + exp(data2$line2)
 ```
