@@ -1,6 +1,7 @@
 # Making sigma a parameter for optimisation in optim
 # -----------------------------------------------------------------------------
-# To prevent optim from crashing if it finds the "perfect" parameters
+# Sigma is not the standard deviation of the residual error
+# Use of sigma was wrong!
 # -----------------------------------------------------------------------------
 # Setup environment
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -

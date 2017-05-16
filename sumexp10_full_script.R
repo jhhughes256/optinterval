@@ -19,33 +19,15 @@
 
 # Setup directory
   source(paste(git.dir, reponame, "sumexp_functions.R", sep = "/"))
+  source(paste(git.dir, reponame, "sumexp_data.R", sep = "/"))
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 # Simulate data
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-# Absorption Curve
-  time.samp <- seq(0, 48, by = 2)
-  absdata <- data.frame(
-    time = time.samp,
-    line1 = -0.2*time.samp + 4,
-    line2 = -0.1*time.samp + 4
-  )
-  absdata$sumexp <- exp(absdata$line2) - exp(absdata$line1)
-  #with(absdata, plot(time, sumexp))
-
-# 2 Compartment Curve
-  twodata <- data.frame(
-    time = time.samp,
-    line1 = -0.5*time.samp + 6,
-    line2 = -0.05*time.samp + 5
-  )
-  twodata$sumexp <- exp(twodata$line1) + exp(twodata$line2)
-  #with(twodata, plot(time, log(sumexp)))
-
 # Create datasets
   err <- 1 + rnorm(n = length(time.samp), mean = 0, sd = 0.3)
   data1 <- data.frame(
     time = time.samp,
-    conc = absdata$sumexp*err
+    conc = onedata.abs$sumexp*err
   )
   err <- 1 + rnorm(n = length(time.samp), mean = 0, sd = 0.3)
   data2 <- data.frame(
