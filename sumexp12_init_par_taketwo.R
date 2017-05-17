@@ -11,10 +11,15 @@
     rm(list = ls(all = T))
     graphics.off()
     #git.dir <- "E:/Hughes/Git"
-    git.dir <- "C:/Users/Jim Hughes/Documents/GitRepos"
-    #git.dir <- "C:/Users/hugjh001/Documents"
+    #git.dir <- "C:/Users/Jim Hughes/Documents/GitRepos"
+    git.dir <- "C:/Users/hugjh001/Documents"
     reponame <- "optinterval"
   }
+
+# Load and configure libraries
+  library(ggplot2)
+  theme_bw2 <- theme_set(theme_bw(base_size = 14))
+  theme_update(plot.title = element_text(hjust = 0.5))
 
 # Load in functions
 # Sum of exponentials predicted concentrations function
@@ -32,11 +37,30 @@
 
 # Maximum likelihood estimation function for parameter optimisation
   mle.sumexp <- function(par, x, y) {
-    yhat <- pred.sumexp(par, x)
-    err <- y - yhat
-    sigma <- 0.01
-    loglik <- dnorm(y, yhat, sigma, log = T)
+    yhat <- pred.sumexp(par[-length(par)], x)
+    sigma <- abs(par[length(par)])
+    loglik <- dnorm(y, yhat, yhat*sigma, log = T)
     return(-1*sum(loglik))
+  }
+
+  plot.sumexp <- function(res, data) {
+    plotdata <- data.frame(
+      time = data$time,
+      cobs = data$conc,
+      pred = pred.sumexp(res$par[-length(res$par)], data$time, 0),
+      objv = res$value
+    )
+    ylim <- c(0, 1.1*max(plotdata$cobs))
+    xlim <- c(0, max(plotdata$time))
+
+    plotobj <- NULL
+    plotobj <- ggplot(data = plotdata)
+    plotobj <- plotobj + ggtitle("Predicted and Observed vs. Time")
+    plotobj <- plotobj + geom_point(aes(x = time, y = cobs))
+    plotobj <- plotobj + geom_line(aes(x = time, y = pred), colour = "red")
+    plotobj <- plotobj + scale_y_continuous("Concentration (mg/mL)\n", lim = ylim)
+    plotobj <- plotobj + scale_x_continuous("\nTime after dose (hrs)", lim = xlim)
+    plotobj
   }
 
 # Load in data
@@ -45,40 +69,85 @@
 # Simulate data
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 # Create datasets
-  err <- 1 + rnorm(n = length(time.samp), mean = 0, sd = 0.3)
+  err <- 1 + rnorm(n = length(time.samp), mean = 0, sd = 0.05)
   data1 <- data.frame(
     time = time.samp,
-    conc = onedata.abs$sumexp#*err
+    conc = onedata.abs$sumexp*err
   )
   data2 <- data.frame(
     time = time.samp,
-    conc = twodata$sumexp#*err
+    conc = twodata$sumexp*err
+  )
+  data3 <- data.frame(
+    time = time.samp,
+    conc = twodata.abs$sumexp*err
   )
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 # Initial parameters
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 # Determine initial parameters for one exponential
-  x <- data1[which(data1[, 2] != 0), 1]
-  y <- data1[which(data1[, 2] != 0), 2]
+  x <- data3[which(data3[, 2] != 0), 1]
+  y <- data3[which(data3[, 2] != 0), 2]
   sub.y <- which(y == max(y)):length(y)
   lm.par1 <- unname(lm(log(y[sub.y]) ~ x[sub.y])$coefficients)
   init.par1 <- c(lm.par1[2], lm.par1[1])
 
 # Determine for two exponential
 # Use init.par1 because optim result will be suboptimal for absorption
-  temp <- pred.sumexp(init.par1, time.samp) - data1[,2]
-  temp[temp <= 0.1] <- NA
-  lm.par2 <- unname(lm(log(temp[!is.na(temp)]) ~ x[!is.na(temp)])$coefficients)
+  temp <- pred.sumexp(init.par1, time.samp) - data3[,2]
+  temp <- temp[1:(which(temp <= 0.1)[1] - 1)]
+  lm.par2 <- unname(lm(log(temp) ~ x[1:length(temp)])$coefficients)
   init.par2 <- c(lm.par1[2], lm.par2[2], lm.par1[1])
 
 # Determine for three exponential
 # Use optim result now
-  optim(
-    init.par2,
+  optres2 <- optim(
+    c(init.par2, 0.01),
     mle.sumexp,
-    method = "L-BFGS-B",
-    lower = rep(-Inf, 3),
-    upper = c(rep(-1/10^10, 2), rep(Inf, 1)),
-    control = list(maxit = 500),
+    method = "SANN",
     x = x, y = y
   )
+  #plot.sumexp(optres2, data3)
+  tail.fit <- function(x, y) {
+    all.n <- double(0)
+    i <- 1
+    max.bad <- 1
+    repeat {
+      n <- 3
+      b.r2 <- 0
+      bad <- 0
+      repeat {
+        r2 <- summary(lm(log(tail(y, n)) ~ tail(x, n)))$adj.r.squared
+        if (b.r2 < r2) {
+          b.r2 <- r2
+          bad <- 0
+        } else {
+          bad <- bad + 1
+        }
+        if (bad == max.bad) {
+          n <- n - bad
+          break
+        }
+        n <- n + 1
+      }
+      if (i == 1) {
+        all.n[i] <- n
+        i <- i + 1
+      } else {
+        if (all.n[i-1] != n) {
+          all.n[i] <- n
+          i <- i + 1
+        }
+      }
+      if ((max.bad + all.n[i-1]) >= length(y)) break
+      max.bad <- max.bad + 1
+    }
+    all.n
+  }
+  n <- tail(tail.fit(x, y), 2)[-2]
+  lm.par3 <- unname(lm(log(tail(y, n)) ~ tail(x, n))$coefficients)
+  n2 <- tail.fit(x[1:10], y[1:10])
+  lm.par4 <- unname(lm(log(tail(y[1:10], n2[2])) ~ tail(x[1:10], n2[2]))$coefficients)
+  abs.y <- log(-(data3[,2] - pred.sumexp(c(lm.par3[2], lm.par3[1]), time.samp) - pred.sumexp(c(lm.par4[2], lm.par4[1]), time.samp)))
+  lm.par5 <- unname(lm(abs.y ~ c(0, x))$coefficients)
+  init.par(lm.par3[2], lm.par4[2], )

@@ -31,4 +31,11 @@
   )
   onedata.abs$sumexp <- with(onedata.abs, exp(line2) - exp(line1))
 # Two Compartment Kinetics w/ Absorption
+  twodata.abs <- data.frame(
+    time = time.samp,
+    line1 = -0.4*time.samp + 4,
+    line2 = -0.2*time.samp + log(exp(4)*0.8),
+    line3 = -0.02*time.samp + log(exp(4)*0.2)
+  )
+  twodata.abs$sumexp <- with(twodata.abs, exp(line2) + exp(line3) - exp(line1))
 # Three Compartment Kinetics w/ Absorption
