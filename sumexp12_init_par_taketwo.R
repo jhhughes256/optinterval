@@ -39,7 +39,7 @@
   mle.sumexp <- function(par, x, y) {
     yhat <- pred.sumexp(par[-length(par)], x)
     sigma <- abs(par[length(par)])
-    loglik <- dnorm(y, yhat, yhat*sigma, log = T)
+    loglik <- dnorm(y, yhat, sigma, log = T)
     return(-1*sum(loglik))
   }
 
@@ -69,7 +69,7 @@
 # Simulate data
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 # Create datasets
-  err <- 1 + rnorm(n = length(time.samp), mean = 0, sd = 0.05)
+  err <- 1 + rnorm(n = length(time.samp), mean = 0, sd = 0.1)
   data1 <- data.frame(
     time = time.samp,
     conc = onedata.abs$sumexp*err
@@ -78,6 +78,7 @@
     time = time.samp,
     conc = twodata$sumexp*err
   )
+  err <- 1 + rnorm(n = length(time.samp), mean = 0, sd = 0.1)
   data3 <- data.frame(
     time = time.samp,
     conc = twodata.abs$sumexp*err
@@ -85,29 +86,6 @@
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 # Initial parameters
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-# Determine initial parameters for one exponential
-  x <- data3[which(data3[, 2] != 0), 1]
-  y <- data3[which(data3[, 2] != 0), 2]
-  sub.y <- which(y == max(y)):length(y)
-  lm.par1 <- unname(lm(log(y[sub.y]) ~ x[sub.y])$coefficients)
-  init.par1 <- c(lm.par1[2], lm.par1[1])
-
-# Determine for two exponential
-# Use init.par1 because optim result will be suboptimal for absorption
-  temp <- pred.sumexp(init.par1, time.samp) - data3[,2]
-  temp <- temp[1:(which(temp <= 0.1)[1] - 1)]
-  lm.par2 <- unname(lm(log(temp) ~ x[1:length(temp)])$coefficients)
-  init.par2 <- c(lm.par1[2], lm.par2[2], lm.par1[1])
-
-# Determine for three exponential
-# Use optim result now
-  optres2 <- optim(
-    c(init.par2, 0.01),
-    mle.sumexp,
-    method = "SANN",
-    x = x, y = y
-  )
-  #plot.sumexp(optres2, data3)
   tail.fit <- function(x, y) {
     all.n <- double(0)
     i <- 1
@@ -144,10 +122,48 @@
     }
     all.n
   }
-  n <- tail(tail.fit(x, y), 2)[-2]
-  lm.par3 <- unname(lm(log(tail(y, n)) ~ tail(x, n))$coefficients)
-  n2 <- tail.fit(x[1:10], y[1:10])
-  lm.par4 <- unname(lm(log(tail(y[1:10], n2[2])) ~ tail(x[1:10], n2[2]))$coefficients)
+# Determine initial parameters for one exponential
+  x <- data1[which(data1[, 2] != 0), 1]
+  y <- data1[which(data1[, 2] != 0), 2]
+  n1 <- tail.fit(x, y)[1]
+  lm.par1 <- unname(lm(tail(log(y), n1) ~ tail(x, n1))$coefficients)
+  init.par1 <- c(lm.par1[2], lm.par1[1])
+
+# Determine for two exponential
+# Use init.par1 because optim result will be suboptimal for absorption
+  temp <- pred.sumexp(init.par1, time.samp) - data1[,2]
+  if(any(temp <= 0.1)) temp <- temp[1:(which(temp <= 0.1)[1] - 1)]
+  lm.par2 <- unname(lm(log(temp) ~ x[1:length(temp)])$coefficients)
+  init.par2 <- c(lm.par1[2], lm.par2[2], lm.par1[1])
+
+# Determine for three exponential
+# Use optim result now
+  optres1 <- optim(
+    c(init.par2, 0.01),
+    mle.sumexp,
+    method = "L-BFGS-B",
+    lower = c(rep(-Inf, 3), 0.0001),
+    upper = c(rep(-1/10^10, 2), rep(Inf, 2)),
+    control = list(maxit = 500),
+    x = x, y = y
+  )
+  #plot.sumexp(optres2, data3)
+
+  t1 <- length(x) - n1
+  n2 <- tail.fit(x[1:t1], y[1:t1])
+  lm.par3 <- unname(lm(log(tail(y[1:t1], n2[2])) ~ tail(x[1:t1], n2[2]))$coefficients)
   abs.y <- log(-(data3[,2] - pred.sumexp(c(lm.par3[2], lm.par3[1]), time.samp) - pred.sumexp(c(lm.par4[2], lm.par4[1]), time.samp)))
   lm.par5 <- unname(lm(abs.y ~ c(0, x))$coefficients)
-  init.par(lm.par3[2], lm.par4[2], )
+  init.par3 <- c(lm.par3[2], lm.par4[2], optres1$par[2], lm.par3[1], lm.par4[1])
+
+  optres2 <- optim(
+    c(init.par3, 0.01),
+    mle.sumexp,
+    method = "L-BFGS-B",
+    lower = c(rep(-Inf, 5), 0.0001),
+    upper = c(rep(-1/10^10, 3), rep(Inf, 3)),
+    control = list(maxit = 500),
+    x = x, y = y
+  )
+
+  plot.sumexp(optres2, data3)
