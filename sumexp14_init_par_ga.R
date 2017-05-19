@@ -100,16 +100,106 @@
     mutation = gareal_raMutation,
     maxiter = 100
   )
+  plot.sumexp(ga.res@solution, data1)
   bfgs.res <- optim(
     ga.res@solution,
     mle.sumexp,
     method = "BFGS",
     x = x, y = y
   )
+  plot.sumexp(bfgs.res$par, data1)
 
   plot.sumexp(ga.res@solution, data1)
-  plot.sumexp(bfgs.res$par, data1)
 
   # does this method of choosing boundaries work for all cases?
   # made better by using n starting populations, but same total iterations?
   # made better by bigger pop, smaller iterations?
+
+  ga.res <- ga("real-valued", # type of GA to use
+    mle.sumexp, x = x, y = y, ga = T, # maximum likelihood estimation function
+    min = c(rep(lm1[2]*50, 2), lm1[1]-2, 0.001),
+    max = c(rep(-0.01, 2), lm1[1]+2, 1),
+    selection = gareal_lrSelection,
+    crossover = gareal_spCrossover,
+    mutation = gareal_raMutation,
+    popSize = 250,
+    maxiter = 20
+  )
+  # testing done using same number of total patients (popSize * maxiter)
+  # by increasing popSize and reducing maxiter, optimisation is more reliable
+
+  lopop.res <- double(0)
+  hipop.res <- double(0)
+  for (i in 1:100) {
+    lopop.res[i] <- ga("real-valued", # type of GA to use
+      mle.sumexp, x = x, y = y, ga = T, # maximum likelihood estimation function
+      min = c(rep(lm1[2]*50, 2), lm1[1]-2, 0.001),
+      max = c(rep(-0.01, 2), lm1[1]+2, 1),
+      selection = gareal_lrSelection,
+      crossover = gareal_spCrossover,
+      mutation = gareal_raMutation,
+      maxiter = 100
+    )@fitnessValue
+    hipop.res[i] <- ga("real-valued", # type of GA to use
+      mle.sumexp, x = x, y = y, ga = T, # maximum likelihood estimation function
+      min = c(rep(lm1[2]*50, 2), lm1[1]-2, 0.001),
+      max = c(rep(-0.01, 2), lm1[1]+2, 1),
+      selection = gareal_lrSelection,
+      crossover = gareal_spCrossover,
+      mutation = gareal_raMutation,
+      popSize = 250,
+      maxiter = 20
+    )@fitnessValue
+  }
+  c(mean.lopop = mean(lopop.res), sd.lopop = sd(lopop.res),
+    mean.hipop = mean(hipop.res), sd.hipop = sd(hipop.res))
+# -----------------------------------------------------------------------------
+  # examples with other datasets
+
+  x <- data2[which(data2[, 2] != 0), 1]
+  y <- data2[which(data2[, 2] != 0), 2]
+
+  lm1 <- unname(lm(log(y) ~ x)$coefficients)
+  init1 <- c(lm1[2], lm1[1])
+
+  ga.res <- ga("real-valued", # type of GA to use
+    mle.sumexp, x = x, y = y, ga = T, # maximum likelihood estimation function
+    min = c(rep(lm1[2]*50, 2), rep(lm1[1]-2, 2), 0.001),
+    max = c(rep(-0.01, 2), rep(lm1[1]+2, 2), 1),
+    selection = gareal_lrSelection,
+    crossover = gareal_spCrossover,
+    mutation = gareal_raMutation,
+    maxiter = 100
+  )
+  plot.sumexp(ga.res@solution, data2)
+  bfgs.res <- optim(
+    ga.res@solution,
+    mle.sumexp,
+    method = "BFGS",
+    x = x, y = y
+  )
+  plot.sumexp(bfgs.res$par, data2)
+
+  x <- data3[which(data3[, 2] != 0), 1]
+  y <- data3[which(data3[, 2] != 0), 2]
+
+  lm1 <- unname(lm(log(y) ~ x)$coefficients)
+  init1 <- c(lm1[2], lm1[1])
+
+  ga.res <- ga("real-valued", # type of GA to use
+    mle.sumexp, x = x, y = y, ga = T, # maximum likelihood estimation function
+    min = c(rep(lm1[2]*50, 3), rep(lm1[1]-2, 2), 0.001),
+    max = c(rep(-0.01, 3), rep(lm1[1]+2, 2), 1),
+    selection = gareal_lrSelection,
+    crossover = gareal_spCrossover,
+    mutation = gareal_raMutation,
+    maxiter = 100
+  )
+  plot.sumexp(ga.res@solution, data3)
+  bfgs.res <- optim(
+    ga.res@solution,
+    mle.sumexp,
+    method = "BFGS",
+    x = x, y = y
+  )
+  plot.sumexp(bfgs.res$par, data3)
