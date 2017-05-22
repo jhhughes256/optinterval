@@ -128,31 +128,32 @@
   # testing done using same number of total patients (popSize * maxiter)
   # by increasing popSize and reducing maxiter, optimisation is more reliable
 
-  lopop.res <- double(0)
-  hipop.res <- double(0)
   for (i in 1:100) {
-    lopop.res[i] <- ga("real-valued", # type of GA to use
+    pop.res[i] <- ga("real-valued", # type of GA to use
       mle.sumexp, x = x, y = y, ga = T, # maximum likelihood estimation function
       min = c(rep(lm1[2]*50, 2), lm1[1]-2, 0.001),
       max = c(rep(-0.01, 2), lm1[1]+2, 1),
       selection = gareal_lrSelection,
       crossover = gareal_spCrossover,
       mutation = gareal_raMutation,
-      maxiter = 100
-    )@fitnessValue
-    hipop.res[i] <- ga("real-valued", # type of GA to use
-      mle.sumexp, x = x, y = y, ga = T, # maximum likelihood estimation function
-      min = c(rep(lm1[2]*50, 2), lm1[1]-2, 0.001),
-      max = c(rep(-0.01, 2), lm1[1]+2, 1),
-      selection = gareal_lrSelection,
-      crossover = gareal_spCrossover,
-      mutation = gareal_raMutation,
-      popSize = 250,
-      maxiter = 20
+      maxiter = 25,
+      popSize = 250
     )@fitnessValue
   }
-  c(mean.lopop = mean(lopop.res), sd.lopop = sd(lopop.res),
-    mean.hipop = mean(hipop.res), sd.hipop = sd(hipop.res))
+  c(mean.res = mean(pop.res), sd.res = sd(pop.res),
+  min.res = min(pop.res), median.res = median(pop.res), max.res = max(pop.res))
+  # data1 100 runs
+  # maxiter popSize  mean    sd   min median  max benchmark
+  #     100      50  -103   110         -59           42.72
+  #      50     100   -67    52         -49
+  #      40     125   -51    30         -41
+  #      25     200   -46    24         -39
+  #      20     250   -48    27  -194   -41   -15
+  #      10     500   -44    14   -95   -42   -14
+  #       8     625   -50    18  -116   -46   -17
+  #       5    1000   -61    20  -109   -61   -18
+  #       4    1250   -66    21  -129   -67   -21
+
 # -----------------------------------------------------------------------------
   # examples with other datasets
 
