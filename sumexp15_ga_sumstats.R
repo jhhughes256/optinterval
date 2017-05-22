@@ -17,6 +17,8 @@
 # Load and configure libraries
   library(ggplot2)
   library(GA)
+  library(plyr)
+  library(rbenchmark)
   theme_bw2 <- theme_set(theme_bw(base_size = 14))
   theme_update(plot.title = element_text(hjust = 0.5))
 
@@ -75,53 +77,72 @@
     time = time.samp,
     conc = thrdata.abs$sumexp*err
   )
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+# Load in data from GA
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+  loop.res1 <- readRDS(paste(reponame, "gatest_maxiter_popsize.rds", sep="/"))
+
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+# Analyse
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+# loop.res1
+  llply(loop.res1, function(x) {
+    browser()
+  })
+
+
+
+
 
   ########## WARNING #########
   # THIS TAKES AN AGE TO RUN #
-  loop.iter <- c(100, 50, 40, 25, 20, 10, 8, 5, 4)
-  loop.pops <- c(50, 100, 125, 200, 250, 500, 625, 1000, 1250)
-  loop.res <- list(NULL)
-  for (i in 1:6) {
-    if (i == 1) data <- data4
-    else if (i == 2) data <- data1
-    else if (i == 3) data <- data2
-    else if (i == 4) data <- data3
-    else if (i == 5) data <- data5
-    else if (i == 6) data <- data6
-    x <- data[which(data[, 2] != 0), 1]
-    y <- data[which(data[, 2] != 0), 2]
-    lm1 <- unname(lm(log(y) ~ x)$coefficients)
-    i.res <- matrix(nrow = 9, ncol = 8)
-    for (j in 1:9) {
-      j.iter <- loop.iter[j]
-      j.pops <- loop.pops[j]
-      j.res <- double(0)
-      for (k in 1:1000) {
-        j.res[k] <- ga("real-valued", # type of GA to use
-          mle.sumexp, x = x, y = y, ga = T, # maximum likelihood estimation function
-          min = c(rep(lm1[2]*50, ceiling((i+1)/2)), rep(lm1[1]-2, floor((i+1)/2)), 0.001),
-          max = c(rep(-0.01, ceiling((i+1)/2)), rep(lm1[1]+2, floor((i+1)/2)), 1),
-          selection = gareal_lrSelection,
-          crossover = gareal_spCrossover,
-          mutation = gareal_raMutation,
-          maxiter = j.iter,
-          popSize = j.pops
-        )@fitnessValue
+  # Written as a function so you don't accidentally run it! :O
+  function(x) {
+    loop.iter <- c(100, 50, 40, 25, 20, 10, 8, 5, 4)
+    loop.pops <- c(50, 100, 125, 200, 250, 500, 625, 1000, 1250)
+    loop.res <- list(NULL)
+    for (i in 1:6) {
+      if (i == 1) data <- data4
+      else if (i == 2) data <- data1
+      else if (i == 3) data <- data2
+      else if (i == 4) data <- data3
+      else if (i == 5) data <- data5
+      else if (i == 6) data <- data6
+      x <- data[which(data[, 2] != 0), 1]
+      y <- data[which(data[, 2] != 0), 2]
+      lm1 <- unname(lm(log(y) ~ x)$coefficients)
+      i.res <- matrix(nrow = 9, ncol = 8)
+      for (j in 1:9) {
+        j.iter <- loop.iter[j]
+        j.pops <- loop.pops[j]
+        j.res <- double(0)
+        for (k in 1:1000) {
+          j.res[k] <- ga("real-valued", # type of GA to use
+            mle.sumexp, x = x, y = y, ga = T, # maximum likelihood estimation function
+            min = c(rep(lm1[2]*50, ceiling((i+1)/2)), rep(lm1[1]-2, floor((i+1)/2)), 0.001),
+            max = c(rep(-0.01, ceiling((i+1)/2)), rep(lm1[1]+2, floor((i+1)/2)), 1),
+            selection = gareal_lrSelection,
+            crossover = gareal_spCrossover,
+            mutation = gareal_raMutation,
+            maxiter = j.iter,
+            popSize = j.pops
+          )@fitnessValue
+        }
+        j.bench <- benchmark({
+          ga("real-valued", # type of GA to use
+            mle.sumexp, x = x, y = y, ga = T, # maximum likelihood estimation function
+            min = c(rep(lm1[2]*50, ceiling((i+1)/2)), rep(lm1[1]-2, floor((i+1)/2)), 0.001),
+            max = c(rep(-0.01, ceiling((i+1)/2)), rep(lm1[1]+2, floor((i+1)/2)), 1),
+            selection = gareal_lrSelection,
+            crossover = gareal_spCrossover,
+            mutation = gareal_raMutation,
+            maxiter = j.iter,
+            popSize = j.pops
+          )
+        })
+        i.res[j,] <- c(j.iter, j.pops, mean(j.res), sd(j.res),
+          min(j.res), median(j.res), max(j.res), j.bench$elapsed)
       }
-      j.bench <- benchmark({
-        ga("real-valued", # type of GA to use
-          mle.sumexp, x = x, y = y, ga = T, # maximum likelihood estimation function
-          min = c(rep(lm1[2]*50, ceiling((i+1)/2)), rep(lm1[1]-2, floor((i+1)/2)), 0.001),
-          max = c(rep(-0.01, ceiling((i+1)/2)), rep(lm1[1]+2, floor((i+1)/2)), 1),
-          selection = gareal_lrSelection,
-          crossover = gareal_spCrossover,
-          mutation = gareal_raMutation,
-          maxiter = j.iter,
-          popSize = j.pops
-        )
-      })
-      i.res[j,] <- c(j.iter, j.pops, mean(j.res), sd(j.res),
-        min(j.res), median(j.res), max(j.res), j.bench$elapsed)
+      loop.res[[i]] <- i.res
     }
-    loop.res[[i]] <- i.res
   }
