@@ -10,6 +10,12 @@ _intervals used in the determination of AUC using trapezoidal integration_
 
 # --------------------------------------------------------------------------------
 ``` {r sim.data, echo = F}
+# Setup workspace  
+  library(GA)
+  library(ggplot2)
+  theme_bw2 <- theme_set(theme_bw(base_size = 14))
+  theme_update(plot.title = element_text(hjust = 0.5))
+  
 # Absorption Curve
   time.samp <- seq(0, 48, by = 2)
   absdata <- data.frame(
@@ -30,16 +36,35 @@ _intervals used in the determination of AUC using trapezoidal integration_
   #with(twodata, plot(time, log(sumexp)))
 
 # Create datasets
-  err <- 1 + rnorm(n = length(time.samp), mean = 0, sd = 0.3)
+  err <- 1 + rnorm(n = length(time.samp), mean = 0, sd = 0.1)
   data1 <- data.frame(
     time = time.samp,
-    conc = absdata$sumexp#*err
+    conc = absdata$sumexp*err
   )
-  err <- 1 + rnorm(n = length(time.samp), mean = 0, sd = 0.3)
+  err <- 1 + rnorm(n = length(time.samp), mean = 0, sd = 0.1)
   data2 <- data.frame(
     time = time.samp,
-    conc = twodata$sumexp#*err
+    conc = twodata$sumexp*err
   )
+  
+  plot.sumexp <- function(res, data) {
+    plotdata <- data.frame(
+      time = data$time,
+      cobs = data$conc,
+      pred = pred.sumexp(res[-length(res)], data$time, 0)
+    )
+    ylim <- c(0, 1.1*max(plotdata$cobs))
+    xlim <- c(0, max(plotdata$time))
+
+    plotobj <- NULL
+    plotobj <- ggplot(data = plotdata)
+    plotobj <- plotobj + ggtitle("Predicted and Observed vs. Time")
+    plotobj <- plotobj + geom_point(aes(x = time, y = cobs))
+    plotobj <- plotobj + geom_line(aes(x = time, y = pred), colour = "red")
+    plotobj <- plotobj + scale_y_continuous("Concentration (mg/mL)\n", lim = ylim)
+    plotobj <- plotobj + scale_x_continuous("\nTime after dose (hrs)", lim = xlim)
+    plotobj
+  }
 ```
 ### Trapezoidal Error
 When approximating the definite integral (aka AUC) using trapezoidal 
@@ -133,30 +158,28 @@ parameters. When $d$ these terms are equal to 1 and do not affect the
 exponentials
 
 ### Optimisation of Sum of Exponential Parameters
-The function that is used to optimise the sum of exponential uses maximum
-likelihood estimation. Final parameter from optim is removed; this is sigma.
-Sigma is a parameter so that it is minimised, but has boundaries so that it 
-doesn't reach zero.
-
-``` {r mle.sumexp}
-# Maximum likelihood estimation function for parameter optimisation
-  mle.sumexp <- function(par, x, y) {
-    yhat <- pred.sumexp(par, x)
-    sigma <- 0.01
-    loglik <- dnorm(y, yhat, yhat*sigma, log = T)
-    return(-1*sum(loglik))
-  }
-```
-
-But the first step of the algorithm is to determine the sum of exponentials that 
+The first step of the algorithm is to determine the sum of exponentials that 
 best describes the data. This function takes the `data` as input, a logical
 statement of whether or not the data is for an `oral` drug and the maximum 
 number of exponentials `nexp` that the function will try to optimise. 
 
+``` {r mle.sumexp, echo = F}
+# Maximum likelihood estimation function for parameter optimisation
+  mle.sumexp <- function(par, x, y, ga = F) {
+  # If using GA::ga set up for maximising of objective function value
+    z <- ifelse(ga, 1, -1)
+  # Determine exponential curve from given parameters
+    yhat <- pred.sumexp(par[-length(par)], x)
+  # Last parameter is equal to the sigma of density distribution
+    sigma <- par[length(par)]
+    loglik <- dnorm(y, yhat, abs(sigma), log = T)
+    return(z*sum(loglik))
+  }
+```
 ``` {r optim.sumexp}
 # Fit sum of exponentials to curve for different numbers of exponentials
   optim.sumexp <- function(data, oral = F, nexp = 3) {
-  # Collate data and ready final objects
+  # Set up data for use, ready environment for loops
     x <- data[which(data[, 2] != 0), 1]
     y <- data[which(data[, 2] != 0), 2]
     opt.par <- list(NULL)
@@ -164,54 +187,45 @@ number of exponentials `nexp` that the function will try to optimise.
     opt.gra <- list(NULL)
     opt.con <- list(NULL)
     opt.mes <- list(NULL)
-  # Determine the exponential curve that describes the data
-  # Specifically the data after the Cmax
-  # This determines the initial parameters for optimisation
-    sub.y <- which(y == max(y)):length(y)
-    lm.par <- unname(lm(log(y[sub.y]) ~ x[sub.y])$coefficients)
-  # Loop for maximum number of exponentials
+  # Determine fit by linear model for genetic algorithm boundaries
+    lmres <- unname(lm(log(y) ~ x)$coefficients)
+  # Begin loop
     for (i in 1:nexp) {
-    # For the first two loops lm.par is used to determine initial parameters
-      if (i == 1) {
-        init.par <- c(lm.par[2], lm.par[1])
-      } else if (i == 2) {
-        if (oral) {
-          init.par <- c(lm.par[2]*c(0.8, 1.2), lm.par[1])
-        } else {
-          init.par <- c(lm.par[2]*c(0.8, 1.2), lm.par[1]*c(1, 1.2))
-        }
+      if (i == 1 & !oral) {
+      # Currently an area of issue around fitting 1 compartment curves
+      # 1 compartment curve rarely (if ever) has the best obj
+        sigres <- optim(
+          0.1,
+          function(z) mle.sumexp(unname(c(lmres[2], lmres[1], z)), x, y),
+          method = "Brent", lower = 0.001, upper = 10^10
+        )
+        optres <- list(
+          par = unname(c(lmres[2], lmres[1], sigres$par)),
+          value = sigres$value,
+          counts = NULL, convergence = 0, message = NULL
+        )
       } else {
-      # Three loops and onwards, the previous final estimates are used
-        if (oral) {
-        # For oral the mean of the slope parameter is used
-        # For the intercept parameter the sum is split up and separated by 10%
-          s <- seq(1-(i-(oral+1))*0.05, 1+(i-(oral+1))*0.05, length.out = i-oral)
-          init.par <- c(
-            mean(optres$par[1:(i-1)]), optres$par[1:(i-1)],
-            log(sum(exp(optres$par[i:(2*i-3)]))/(i-1)*s)
-          )
-        } else {
-        # For iv bolus the mean of the slope and intercept parameter is used
-          init.par <- c(
-            mean(optres$par[1:(i-1)]), optres$par[1:(i-1)],
-            mean(optres$par[i:(2*i-2)]), optres$par[i:(2*i-2)]
-          )
-        }
+      # For all data being described by 2 or more exponentials
+      # First use genetic algorithms to determine initial parameters
+        gares <- ga("real-valued",
+          mle.sumexp, x = x, y = y, ga = T,
+          min = c(rep(lmres[2]*50, i + oral), rep(lmres[1]-2, i), 0.001),
+          max = c(rep(lmres[2]/50, i + oral), rep(lmres[1]+2, i), 1),
+          selection = gareal_lrSelection,
+          crossover = gareal_spCrossover,
+          mutation = gareal_raMutation,
+          maxiter = 20,
+          popSize = 250
+        )
+      # Then optimise the curve using standard hill-climbing optimisation
+        optres <- optim(
+          gares@solution,
+          mle.sumexp,
+          method = "BFGS",
+          x = x, y = y
+        )
       }
-      browser()
-    # For each number of exponentials optimise the sum of exponential parameters
-    # slopes have upper bound of ~0 as all curves will be exponential decay
-    # sigma has lower bound of 0.0001, as sigma != 0
-      optres <- optim(
-        init.par,  # Sigma parameter added to init.par for optimisation
-        mle.sumexp,  # maximum likelihood fitting function
-        method = "L-BFGS-B",
-        lower = rep(-Inf, i),
-        upper = c(rep(-1/10^10, i), rep(Inf, i)),
-        control = list(maxit = 500),
-        x = x, y = y
-      )
-    # record values, while removing sigma
+    # Collate the results
       opt.par[[i]] <- optres$par
       opt.val[[i]] <- optres$value
       opt.gra[[i]] <- optres$counts
@@ -219,18 +233,39 @@ number of exponentials `nexp` that the function will try to optimise.
       opt.mes[[i]] <- ifelse(is.null(optres$message),
         "NULL", optres$message)
     }
-
+  # name the results for output
     res <- list(par = opt.par, value = opt.val, counts = opt.gra,
       convergence = opt.con, message = opt.mes)
     res
   }
 ```
 
-The biggest limitation with optimising the sum of exponential parameters is the
-initial parameters that are used. This is certainly an area that can be 
-improved, however improvements are not always easily noticable.
+The `mle.sumexp` function seen in both the `ga` and `optim` functions is used 
+for optimisation of parameters. It uses maximum likelihood estimation as shown
+below. The parameters given to the function include the parameters used by 
+`pred.sumexp` but also a value for sigma in the `dnorm` function.
 
-This function produces the following output when used on oral drug data:
+``` {r mle.sumexp.echo}
+  mle.sumexp
+```
+
+The biggest limitation with optimising the sum of exponential parameters is the
+initial parameters that are used. A genetic algorithm is used to determine 
+these parameters, as this results in initial parameters based on the objective 
+value.
+
+The use of genetic algorithms makes a few assumptions:
+* The boundaries provided contain the parameters of best fit
+    + current range of boundaries are 2500-fold, 50-fold and 1000-fold for 
+    slope, intercept and sigma respectively
+* The maximum iterations will allow the algorithm to reach an adequate set 
+of initial parameters 
+    + if initial parameters are not adequate, BFGS will not be able to 
+    optimise the parameters
+* The use of the GA package for convenience outweighs the loss of control by
+not using my own genetic algorithm function
+
+The `optim.sumexp` function produces the following output when used on oral drug data:
 
 ``` {r example.optim, echo = F}
   suppressWarnings(print(
@@ -266,7 +301,7 @@ selection.
       degf <- length(opt$par[[j]]) - length(opt$par[[i]])
       x <- opt$value[[i]] - opt$value[[j]]
       p <- pchisq(x, degf, lower.tail = F)
-      if (p < 0.01) {
+      if (p < 0.05) {
         i <- i + 1
       }
     }
@@ -274,8 +309,82 @@ selection.
   }
 ```
 
+This gives the following result:
 ``` {r example.chisq, echo = F}
   print(
-    chisq.sumexp(temp)
+    temp2 <- chisq.sumexp(temp)
   )
+  plot.sumexp(temp2$par, data2)
 ```
+
+### Optimise Sampling Intervals
+``` {r err.interv, echo = F}
+  err.interv <- function(par, exp.par, tmin, tmax, theta) {
+    times <- c(tmin, par, tmax)
+    deltat <- diff(times)
+    secd <- pred.sumexp(exp.par, theta, 2)  # d = 2 (second derivative)
+    err <- abs(deltat^3*secd/12)
+    sum(err)
+  }
+```
+
+Using the exponential curve that best fits the data, the algorithm then 
+determines the sampling intervals that will minimise  trapezoidal error when
+used.
+
+``` {r optim.interv}
+# Interval optimising function
+  optim.interv <- function(times, fit.par) {
+  # Order the times and determine min and max times so they can be fixed
+    x <- times[order(times)]
+    init.par <- x[-c(1, length(x))]
+    xmin <- min(x)
+    xmax <- max(x)
+    theta <- c(NULL)
+  # Determine theta for each initial time, (time with maximum f''(x))
+    for (i in 1:(length(times)-1)) {
+      theta[i] <- optim(
+        mean(c(times[i], times[i+1])),
+        function(t, x) -abs(pred.sumexp(x, t, 2)),
+        method = "L-BFGS-B", control = c(maxit = 500),
+        lower = times[i], upper = times[i+1], x = fit.par
+      )$par
+    }
+  # Determine optimal sampling intervals by minimising trapezoidal error
+    res <- optim(
+      init.par,
+      err.interv,
+      method = "L-BFGS-B", control = c(maxit = 500),
+      lower = xmin, upper = xmax,
+      exp.par = fit.par, tmin = xmin, tmax = xmax, theta = theta
+    )
+    return(res)
+  }
+```
+
+The trapezoidal error is determined using the `err.interv` function below:
+
+``` {r err.interv.echo}
+  err.interv
+```
+
+There are a few issues with the implementation of this section:
+* The value for theta only applies to the initial parameters
+    + However you can't have an `optim` function within another `optim` function
+    + This seems to place a large emphasis on the initial parameters
+* Does not account for errors seen when using linear-up, log-down trapezoidal 
+method
+    + Theoretically weighs the "log-down" concentrations more heavily than it 
+    should
+    + Is this effect even important?
+    
+The result from using `optim.interv` can be seen below...
+  
+``` {r example.interv, echo = F}
+  nobs <- 8
+  tlast <- 24
+  time.seq <- c(0, exp(seq(-4, 0, length.out = nobs))*tlast)
+  print(temp3 <- optim.interv(time.seq, temp2$par))
+```
+
+Oh it doesn't even work now, that was unexpected...
