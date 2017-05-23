@@ -80,7 +80,12 @@
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 # Load in data from GA
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+  # loop1, tested maciter and popsize using data1 through 6
   loop.res1 <- readRDS(paste(reponame, "gatest_maxiter_popsize.rds", sep="/"))
+
+  # loop2, tested      "       "      using data1 with varying sampling regimens
+  # 1:25, 1:12*2, 1:13, c(2:7, 9, 11, 13, 17, 25), c(2:5, 7, 9, 25), (1:6*4-2)
+  loop.res2 <- readRDS(paste(reponame, "gatest_sampling_regimen.rds"))
 
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 # Analyse
@@ -97,17 +102,16 @@
   ########## WARNING #########
   # THIS TAKES AN AGE TO RUN #
   # Written as a function so you don't accidentally run it! :O
-  function(x) {
     loop.iter <- c(100, 50, 40, 25, 20, 10, 8, 5, 4)
     loop.pops <- c(50, 100, 125, 200, 250, 500, 625, 1000, 1250)
     loop.res <- list(NULL)
     for (i in 1:6) {
-      if (i == 1) data <- data4
-      else if (i == 2) data <- data1
-      else if (i == 3) data <- data2
-      else if (i == 4) data <- data3
-      else if (i == 5) data <- data5
-      else if (i == 6) data <- data6
+      if (i == 1) data <- data1
+      else if (i == 2) data <- data1[c(1:12*2),]
+      else if (i == 3) data <- data1[c(1:13),]
+      else if (i == 4) data <- data1[c(2:7, 9, 11, 13, 17, 25),]
+      else if (i == 5) data <- data1[c(2:5, 7, 9, 25),]
+      else if (i == 6) data <- data1[c(1:6*4-2),]
       x <- data[which(data[, 2] != 0), 1]
       y <- data[which(data[, 2] != 0), 2]
       lm1 <- unname(lm(log(y) ~ x)$coefficients)
@@ -119,8 +123,8 @@
         for (k in 1:1000) {
           j.res[k] <- ga("real-valued", # type of GA to use
             mle.sumexp, x = x, y = y, ga = T, # maximum likelihood estimation function
-            min = c(rep(lm1[2]*50, ceiling((i+1)/2)), rep(lm1[1]-2, floor((i+1)/2)), 0.001),
-            max = c(rep(-0.01, ceiling((i+1)/2)), rep(lm1[1]+2, floor((i+1)/2)), 1),
+            min = c(rep(lm1[2]*50, 2), lm1[1]-2, 0.001),
+            max = c(rep(-0.01, 2), lm1[1]+2, 1),
             selection = gareal_lrSelection,
             crossover = gareal_spCrossover,
             mutation = gareal_raMutation,
@@ -131,8 +135,8 @@
         j.bench <- benchmark({
           ga("real-valued", # type of GA to use
             mle.sumexp, x = x, y = y, ga = T, # maximum likelihood estimation function
-            min = c(rep(lm1[2]*50, ceiling((i+1)/2)), rep(lm1[1]-2, floor((i+1)/2)), 0.001),
-            max = c(rep(-0.01, ceiling((i+1)/2)), rep(lm1[1]+2, floor((i+1)/2)), 1),
+            min = c(rep(lm1[2]*50, 2), lm1[1]-2, 0.001),
+            max = c(rep(-0.01, 2), lm1[1]+2, 1),
             selection = gareal_lrSelection,
             crossover = gareal_spCrossover,
             mutation = gareal_raMutation,
@@ -145,4 +149,3 @@
       }
       loop.res[[i]] <- i.res
     }
-  }
