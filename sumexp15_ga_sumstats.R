@@ -8,9 +8,10 @@
   if (!exists("git.dir")) {
     rm(list = ls(all = T))
     graphics.off()
-    #git.dir <- "E:/Hughes/Git"
+    git.dir <- "E:/Hughes/Git"
     #git.dir <- "C:/Users/Jim Hughes/Documents/GitRepos"
-    git.dir <- "C:/Users/hugjh001/Documents"
+    #git.dir <- "C:/Users/hugjh001/Documents"
+    setwd(git.dir)
     reponame <- "optinterval"
   }
 
@@ -80,19 +81,24 @@
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 # Load in data from GA
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-  # loop1, tested maciter and popsize using data1 through 6
+  # loop1, tested maxiter and popsize using data1 through 6
   loop.res1 <- readRDS(paste(reponame, "gatest_maxiter_popsize.rds", sep="/"))
 
   # loop2, tested      "       "      using data1 with varying sampling regimens
   # 1:25, 1:12*2, 1:13, c(2:7, 9, 11, 13, 17, 25), c(2:5, 7, 9, 25), (1:6*4-2)
   loop.res2 <- readRDS(paste(reponame, "gatest_sampling_regimen.rds"))
 
+  # loop3, tested maxiter for popsize 250
+  # using data from loop2
+  loop.res3 <- readRDS(paste(reponame, "gatest_maxiter_fixedpop.rds"))
+
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 # Analyse
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 # loop.res1
-  llply(loop.res1, function(x) {
-    browser()
+  loop.res3 <- llply(loop.res, function(x) {
+    colnames(x) <- c("maxiter", "popSize", "mean", "sd", "min", "med", "max", "bench")
+    x
   })
 
 
@@ -102,8 +108,7 @@
   ########## WARNING #########
   # THIS TAKES AN AGE TO RUN #
   # Written as a function so you don't accidentally run it! :O
-    loop.iter <- c(100, 50, 40, 25, 20, 10, 8, 5, 4)
-    loop.pops <- c(50, 100, 125, 200, 250, 500, 625, 1000, 1250)
+    loop.iter <- c(10, 20, 40, 60, 80, 100)
     loop.res <- list(NULL)
     for (i in 1:6) {
       if (i == 1) data <- data1
@@ -116,9 +121,9 @@
       y <- data[which(data[, 2] != 0), 2]
       lm1 <- unname(lm(log(y) ~ x)$coefficients)
       i.res <- matrix(nrow = 9, ncol = 8)
-      for (j in 1:9) {
+      for (j in 1:6) {
         j.iter <- loop.iter[j]
-        j.pops <- loop.pops[j]
+        j.pops <- 250
         j.res <- double(0)
         for (k in 1:1000) {
           j.res[k] <- ga("real-valued", # type of GA to use
