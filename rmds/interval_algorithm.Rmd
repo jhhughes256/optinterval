@@ -2,20 +2,19 @@
 title: "Interval Optimisation Algorithm"
 output:
   html_document: default
-  html_notebook: default
   word_document: default
 ---
-_An explanation of the processes used to minimise associated with the time_ 
+_An explanation of the processes used to minimise associated with the time_
 _intervals used in the determination of AUC using trapezoidal integration_
 
 # --------------------------------------------------------------------------------
 ``` {r sim.data, echo = F}
-# Setup workspace  
+# Setup workspace
   library(GA)
   library(ggplot2)
   theme_bw2 <- theme_set(theme_bw(base_size = 14))
   theme_update(plot.title = element_text(hjust = 0.5))
-  
+
 # Absorption Curve
   time.samp <- seq(0, 48, by = 2)
   absdata <- data.frame(
@@ -46,7 +45,7 @@ _intervals used in the determination of AUC using trapezoidal integration_
     time = time.samp,
     conc = twodata$sumexp*err
   )
-  
+
   plot.sumexp <- function(res, data) {
     plotdata <- data.frame(
       time = data$time,
@@ -67,32 +66,32 @@ _intervals used in the determination of AUC using trapezoidal integration_
   }
 ```
 ### Trapezoidal Error
-When approximating the definite integral (aka AUC) using trapezoidal 
+When approximating the definite integral (aka AUC) using trapezoidal
 integration, the number and spacing of time intervals directly impact the error
 of this approximation. This error is represented by:
 $$\epsilon=\int_a^{b}f(x)dx - \frac{b-a}{2}[f(a) + f(b)]$$
 This can be simplified to:
 $$\epsilon=\frac{(b-a)^3}{12}f''(\theta) \space \space \space \space{a \le \theta \le b}$$
 This is achieved using integration by parts and the proof is in the link below.
-Link: http://www.math.ucsd.edu/~ebender/20B/77_Trap.pdf 
+Link: http://www.math.ucsd.edu/~ebender/20B/77_Trap.pdf
 
-Given a number of time intervals, it is possible to find the optimum spacing 
+Given a number of time intervals, it is possible to find the optimum spacing
 for these times to minimise the error associated with trapezoidal integration.
 
-To optimise the time intervals, $f''(/theta)$ must be fixed. This requires a 
-function describing the curve. A solution for this is the use of sum of 
+To optimise the time intervals, $f''(/theta)$ must be fixed. This requires a
+function describing the curve. A solution for this is the use of sum of
 exponentials.
 
 ### Why Sum of Exponentials?
 Basic pharmacokinetic models are effectively described using the sum of one or
-more exponential terms. For example a one-compartment pharmacokinetic model is 
+more exponential terms. For example a one-compartment pharmacokinetic model is
 described using:
 $$C=C_0e^{-\frac{CL}{Vd}t}$$
 If we let $-\frac{CL}{Vd}=m$ and $c=lny_0$ then this can be written more simply
 as:
 $$y=e^ce^{mx}$$
 $$y=e^{mx+c}$$
-This matches what is seen when viewing a one-compartment model using a 
+This matches what is seen when viewing a one-compartment model using a
 log-scale for the y-axis.
 ``` {r 1comp.plot.example}
   examplesumexp.par <- list(CL = 10, Vd = 20, C0 = 100, time = 1:24)
@@ -105,7 +104,7 @@ described using these equations.
 
 ### The Sum of Exponentials Algorithm
 A key part of the algorithm is a function that can calculate the dependent
-variable given a group of parameters. 
+variable given a group of parameters.
 
 The function below is designed to take `x`, the parameters which describe the
 sum of exponentials, `t` the time points to be predicted and `d` to calculate
@@ -140,28 +139,28 @@ trapezoidal error).
 ```
 
 Parameters consist of two sets of numbers; the slope $m$ parameters and the
-intercept $c$ parameters. It is important to note that $c$ is the 
-log-transformed intercept, so when creating a sum of intercepts it must be 
-transformed back. 
+intercept $c$ parameters. It is important to note that $c$ is the
+log-transformed intercept, so when creating a sum of intercepts it must be
+transformed back.
 
 The number of $m$ parameters represent the number of exponentials in the sum.
-The number of $c$ parameters contain the information required to determine 
-whether the sum of exponentials is for predicting concentrations of an iv 
+The number of $c$ parameters contain the information required to determine
+whether the sum of exponentials is for predicting concentrations of an iv
 bolus curve or an absorption curve. An even number implies an iv bolus, an odd
-number implies absorption. One less intercept is required for absorption, as 
+number implies absorption. One less intercept is required for absorption, as
 the sum of the intercepts of the positive exponentials sum to the intercept of
 the negative exponential.
 
-The $d$ parameter (seen as a multiplier to the exponentials; $m^d$) simply 
+The $d$ parameter (seen as a multiplier to the exponentials; $m^d$) simply
 determines the $d$th derivative for the sum of exponentials described by the
-parameters. When $d$ these terms are equal to 1 and do not affect the 
+parameters. When $d$ these terms are equal to 1 and do not affect the
 exponentials
 
 ### Optimisation of Sum of Exponential Parameters
-The first step of the algorithm is to determine the sum of exponentials that 
+The first step of the algorithm is to determine the sum of exponentials that
 best describes the data. This function takes the `data` as input, a logical
-statement of whether or not the data is for an `oral` drug and the maximum 
-number of exponentials `nexp` that the function will try to optimise. 
+statement of whether or not the data is for an `oral` drug and the maximum
+number of exponentials `nexp` that the function will try to optimise.
 
 ``` {r mle.sumexp, echo = F}
 # Maximum likelihood estimation function for parameter optimisation
@@ -240,9 +239,9 @@ number of exponentials `nexp` that the function will try to optimise.
   }
 ```
 
-The `mle.sumexp` function seen in both the `ga` and `optim` functions is used 
+The `mle.sumexp` function seen in both the `ga` and `optim` functions is used
 for optimisation of parameters. It uses maximum likelihood estimation as shown
-below. The parameters given to the function include the parameters used by 
+below. The parameters given to the function include the parameters used by
 `pred.sumexp` but also a value for sigma in the `dnorm` function.
 
 ``` {r mle.sumexp.echo}
@@ -250,17 +249,18 @@ below. The parameters given to the function include the parameters used by
 ```
 
 The biggest limitation with optimising the sum of exponential parameters is the
-initial parameters that are used. A genetic algorithm is used to determine 
-these parameters, as this results in initial parameters based on the objective 
+initial parameters that are used. A genetic algorithm is used to determine
+these parameters, as this results in initial parameters based on the objective
 value.
 
 The use of genetic algorithms makes a few assumptions:
+
 * The boundaries provided contain the parameters of best fit
-    + current range of boundaries are 2500-fold, 50-fold and 1000-fold for 
+    + current range of boundaries are 2500-fold, 50-fold and 1000-fold for
     slope, intercept and sigma respectively
-* The maximum iterations will allow the algorithm to reach an adequate set 
-of initial parameters 
-    + if initial parameters are not adequate, BFGS will not be able to 
+* The maximum iterations will allow the algorithm to reach an adequate set
+of initial parameters
+    + if initial parameters are not adequate, BFGS will not be able to
     optimise the parameters
 * The use of the GA package for convenience outweighs the loss of control by
 not using my own genetic algorithm function
@@ -285,9 +285,9 @@ optimise
 `message` gives information on the convergence
 
 ### Selecting the Number of Exponentials
-Once the best parameters are determined for the sets of exponentials of 
+Once the best parameters are determined for the sets of exponentials of
 interest, it is time to determine which sum of exponentials is best. As these
-are effectively nested models, a chi-squared test has been chosen for model 
+are effectively nested models, a chi-squared test has been chosen for model
 selection.
 
 ``` {r chisq.sumexp}
@@ -328,7 +328,7 @@ This gives the following result:
   }
 ```
 
-Using the exponential curve that best fits the data, the algorithm then 
+Using the exponential curve that best fits the data, the algorithm then
 determines the sampling intervals that will minimise  trapezoidal error when
 used.
 
@@ -372,14 +372,14 @@ There are a few issues with the implementation of this section:
 * The value for theta only applies to the initial parameters
     + However you can't have an `optim` function within another `optim` function
     + This seems to place a large emphasis on the initial parameters
-* Does not account for errors seen when using linear-up, log-down trapezoidal 
+* Does not account for errors seen when using linear-up, log-down trapezoidal
 method
-    + Theoretically weighs the "log-down" concentrations more heavily than it 
+    + Theoretically weighs the "log-down" concentrations more heavily than it
     should
     + Is this effect even important?
-    
+
 The result from using `optim.interv` can be seen below...
-  
+
 ``` {r example.interv, echo = F}
   nobs <- 8
   tlast <- 24

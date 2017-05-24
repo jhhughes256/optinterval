@@ -60,7 +60,7 @@
           selection = gareal_lrSelection,
           crossover = gareal_spCrossover,
           mutation = gareal_raMutation,
-          maxiter = 20,
+          maxiter = 50,
           popSize = 250
         )
         optres <- optim(
