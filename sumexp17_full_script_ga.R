@@ -12,11 +12,13 @@
     rm(list = ls(all = T))
     graphics.off()
     #git.dir <- "E:/Hughes/Git"
-    git.dir <- "C:/Users/Jim Hughes/Documents/GitRepos"
-    #git.dir <- "C:/Users/hugjh001/Documents"
+    #git.dir <- "C:/Users/Jim Hughes/Documents/GitRepos"
+    git.dir <- "C:/Users/hugjh001/Documents"
     reponame <- "optinterval"
   }
   library(GA)
+  library(ggplot2)
+  theme_bw2 <- theme_set(theme_bw(base_size = 14))
 
 # Setup directory
   source(paste(git.dir, reponame, "sumexp_functions_ga.R", sep = "/"))
@@ -36,6 +38,37 @@
     conc = twodata$sumexp*err
   )
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+# Output Function
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+# Create a function that presents the data
+  res.out <- function(fitpar, interv, data = NULL, plotdata = F) {
+    if (plotdata) {
+      if (is.null(data)) stop("'data' argument not provided")
+      plotdata <- data.frame(
+        time = data$time,
+        cobs = data$conc,
+        pred = pred.sumexp(fitpar, data[, 1])
+      )
+      ylim <- c(0, 1.1*max(plotdata$cobs))
+      xlim <- c(0, max(plotdata$time))
+      plotobj <- NULL
+      plotobj <- ggplot(data = plotdata)
+      plotobj <- plotobj + ggtitle("Predicted and Observed vs. Time")
+      plotobj <- plotobj + geom_point(aes(x = time, y = cobs))
+      plotobj <- plotobj + geom_line(aes(x = time, y = pred), colour = "red")
+      plotobj <- plotobj + geom_vline(xintercept = interv, colour = "green4", linetype = "dashed")
+      plotobj <- plotobj + scale_y_continuous("Concentration (mg/mL)\n", lim = ylim)
+      plotobj <- plotobj + scale_x_continuous("\nTime after dose (hrs)", lim = xlim)
+      print(plotobj)
+    }
+    out <- list(
+      sumexp.par = unname(best.sumexp1$par),
+      time.interv = c(0, interv1$par, tlast)
+    )
+    return(out)
+  }
+
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 # Workflow for functions
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 # First function that runs is
@@ -46,16 +79,13 @@
 
 # Now we use these optim results along with our time sequence
 # Originally 49 samples were taken (so many!), but now we only want to use 12
-  nobs <- 6
-  tlast <- 24
+  nobs <- 12
+  tlast <- 48
   time.seq <- c(0, exp(seq(-2.5, 0, length.out = nobs))*tlast)
   interv1 <- optim.interv(time.seq, best.sumexp1$par)
 
 # Lastly we need to provide the information that the output
-  output1 <- list(
-    sumexp.par = best.sumexp1$par,
-    time.interv = c(0, interv1$par, tlast)
-  )
+  res.out(best.sumexp1$par, c(0, interv1$par, tlast), data1, T)
 
 # First function that runs is
   list.sumexp2 <- optim.sumexp(data2, oral = F)

@@ -21,11 +21,10 @@
   }
 
 # Maximum likelihood estimation function for parameter optimisation
-  mle.sumexp <- function(par, x, y, ga = F) {
+  mle.sumexp <- function(par, x, y, sigma, ga = F) {
     z <- ifelse(ga, 1, -1)
-    yhat <- pred.sumexp(par[-length(par)], x)
-    sigma <- par[length(par)]
-    loglik <- dnorm(y, yhat, abs(sigma), log = T)
+    yhat <- pred.sumexp(par, x)
+    loglik <- dnorm(y, yhat, abs(yhat)*sigma, log = T)
     return(z*sum(loglik))
   }
 
@@ -42,21 +41,16 @@
 
     for (i in 1:nexp) {
       if (i == 1 & !oral) {
-        sigres <- optim(
-          0.1,
-          function(z) mle.sumexp(unname(c(lmres[2], lmres[1], z)), x, y),
-          method = "Brent", lower = 0.001, upper = 10^10
-        )
         optres <- list(
-          par = unname(c(lmres[2], lmres[1], sigres$par)),
-          value = sigres$value,
+          par = c(lmres[2], lmres[1]),
+          value = mle.sumexp(unname(c(lmres[2], lmres[1])), x, y, 0.01),
           counts = NULL, convergence = 0, message = NULL
         )
       } else {
         gares <- ga("real-valued",
-          mle.sumexp, x = x, y = y, ga = T,
-          min = c(rep(lmres[2]*50, i + oral), rep(lmres[1]-2, i), 0.001),
-          max = c(rep(lmres[2]/50, i + oral), rep(lmres[1]+2, i), 1),
+          mle.sumexp, x = x, y = y, ga = T, sigma = 0.01,
+          min = c(rep(lmres[2]*50, i + oral), rep(lmres[1]-2, i)),
+          max = c(rep(lmres[2]/50, i + oral), rep(lmres[1]+2, i)),
           selection = gareal_lrSelection,
           crossover = gareal_spCrossover,
           mutation = gareal_raMutation,
@@ -64,10 +58,10 @@
           popSize = 250
         )
         optres <- optim(
-          gares@solution,
+          gares@solution[1, ],
           mle.sumexp,
           method = "BFGS",
-          x = x, y = y
+          x = x, y = y, sigma = 0.01
         )
       }
       opt.par[[i]] <- optres$par
@@ -99,12 +93,20 @@
   }
 
 # Trapezoidal error function for interval optimisation
-  err.interv <- function(par, exp.par, tmin, tmax, theta) {
+  err.interv <- function(par, exp.par, tmin, tmax, a = F) {
     times <- c(tmin, par, tmax)
     deltat <- diff(times)
-    secd <- pred.sumexp(exp.par, theta, 2)  # d = 2 (second derivative)
-    err <- abs(deltat^3*secd/12)
-    sum(err)
+    if (a) {
+      all.secd <- abs(pred.sumexp(exp.par, times, 2))
+      secd <- c(NULL)
+      for (i in 1:(length(times)-1)) {
+        secd[i] <- all.secd[which(all.secd == max(all.secd[c(i, i + 1)]))
+      }
+    } else {
+      secd <- pred.sumexp(exp.par, times[-length(times)], 2)
+    }
+    err <- deltat^3*secd/12
+    sum(err^2)
   }
 
 # Interval optimising function
@@ -113,25 +115,13 @@
     init.par <- x[-c(1, length(x))]
     xmin <- min(x)
     xmax <- max(x)
-    theta <- c(NULL)
-
-    for (i in 1:(length(times)-1)) {
-      theta[i] <- optim(
-        mean(c(times[i], times[i+1])),
-        function(t, x) -abs(pred.sumexp(x, t, 2)),
-        method = "L-BFGS-B", control = c(maxit = 500),
-        lower = times[i], upper = times[i+1], x = fit.par
-      )$par
-    }
-
+    absorp <- ifelse((length(fit.par) %% 2) != 0, T, F)
     res <- optim(
       init.par,
       err.interv,
       method = "L-BFGS-B", control = c(maxit = 500),
       lower = xmin, upper = xmax,
-      exp.par = fit.par, tmin = xmin, tmax = xmax, theta = theta
+      exp.par = fit.par, tmin = xmin + 0.01, tmax = xmax - 0.01, a = absorp
     )
-  # Useful values to return are $par
-  # $value is a sum of errors, errors would be more interesting when separated
     return(res)
   }

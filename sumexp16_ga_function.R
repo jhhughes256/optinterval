@@ -37,22 +37,21 @@
 
 # Maximum likelihood estimation function for parameter optimisation
 # altered to work with GA AND optim, alter the ga argument when working with GA
-  mle.sumexp <- function(par, x, y, ga = F) {
+  mle.sumexp <- function(par, x, y, sigma, ga = F) {
     z <- ifelse(ga, 1, -1)
-    yhat <- pred.sumexp(par[-length(par)], x)
-    sigma <- par[length(par)]
-    loglik <- dnorm(y, yhat, abs(sigma), log = T)
+    yhat <- pred.sumexp(par, x)
+    loglik <- dnorm(y, yhat, abs(yhat)*sigma, log = T)
     return(z*sum(loglik))
   }
 
   plot.sumexp <- function(res, data, oral) {
     plotdata <- ldply(res$par, function(x) {
       data.frame(
-        nexp = as.factor(ceiling((length(x)-1)/2)),
+        nexp = as.factor(ceiling(length(x)/2)),
         time = data$time,
         cobs = data$conc,
-        pred = pred.sumexp(x[-length(x)], data$time, 0),
-        objv = res$value[[ceiling((length(x)-1)/2)-oral]]
+        pred = pred.sumexp(x, data$time, 0),
+        objv = res$value[[ceiling(length(x)/2)-oral]]
       )
     })
     levels(plotdata$nexp) <- paste(levels(plotdata$nexp), "exponent(s)")
@@ -117,32 +116,27 @@
 
     for (i in 1:nexp) {
       if (i == 1 & !oral) {
-        sigres <- optim(
-          0.1,
-          function(z) mle.sumexp(unname(c(lmres[2], lmres[1], z)), x, y),
-          method = "Brent", lower = 0.001, upper = 10^10
-        )
         optres <- list(
-          par = unname(c(lmres[2], lmres[1], sigres$par)),
-          value = sigres$value,
+          par = c(lmres[2], lmres[1]),
+          value = mle.sumexp(unname(c(lmres[2], lmres[1])), x, y, 0.01),
           counts = NULL, convergence = 0, message = NULL
         )
       } else {
-        gares <- ga("real-valued", # type of GA to use
-          mle.sumexp, x = x, y = y, ga = T, # maximum likelihood estimation function
-          min = c(rep(lmres[2]*50, i + oral), rep(lmres[1]-2, i), 0.001),
-          max = c(rep(lmres[2]/50, i + oral), rep(lmres[1]+2, i), 1),
+        gares <- ga("real-valued",
+          mle.sumexp, x = x, y = y, ga = T, sigma = 0.01,
+          min = c(rep(lmres[2]*50, i + oral), rep(lmres[1]-2, i)),
+          max = c(rep(lmres[2]/50, i + oral), rep(lmres[1]+2, i)),
           selection = gareal_lrSelection,
           crossover = gareal_spCrossover,
           mutation = gareal_raMutation,
-          maxiter = 20,
+          maxiter = 50,
           popSize = 250
         )
         optres <- optim(
-          gares@solution,
+          gares@solution[1, ],
           mle.sumexp,
           method = "BFGS",
-          x = x, y = y
+          x = x, y = y, sigma = 0.01
         )
       }
       opt.par[[i]] <- optres$par
