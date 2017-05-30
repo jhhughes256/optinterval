@@ -77,8 +77,9 @@ $$\epsilon=\int_a^{b}f(x)dx - \frac{b-a}{2}[f(a) + f(b)]$$
 
 This can be simplified to:
 $$\epsilon=\frac{(b-a)^3}{12}f''(\theta) \space \space \space \space{a \le \theta \le b}$$
-This is achieved using integration by parts and the proof can be found
-[here](http://www.math.ucsd.edu/~ebender/20B/77_Trap.pdf).
+This is achieved using integration by parts and the proof can be found in this
+[document](http://www.math.ucsd.edu/~ebender/20B/77_Trap.pdf) and is explained
+extensively in this [video](https://www.youtube.com/watch?v=_mrSHIin7Mw).
 
 Given a number of sample times, it is possible to find the optimum spacing
 for these times to minimise the error associated with trapezoidal integration.
@@ -250,8 +251,17 @@ number of exponentials `nexp` that the algorithm will try to optimise.
 It uses maximum likelihood estimation as shown below. The parameters used by
 `mle.sumexp` are the same parameters used by `pred.sumexp`.
 
-``` {r mle.sumexp.echo}
-  mle.sumexp
+``` {r mle.sumexp.echo, eval = F}
+  function(par, x, y, sigma, ga = F) {
+  # If using GA::ga set up for maximising of objective function value
+  # Otherwise set up for minimisation with base::optim
+    z <- ifelse(ga, 1, -1)
+  # Determine exponential curve from given parameters
+    yhat <- pred.sumexp(par, x)
+  # Determine the log likelihood using sigma proportional to yhat
+    loglik <- dnorm(y, yhat, abs(yhat)*sigma, log = T)
+    return(z*sum(loglik))
+  }
 ```
 
 A limitation with optimising the sum of exponential parameters is the impact
@@ -382,8 +392,30 @@ $$\epsilon=\frac{(b-a)^3}{12}f''(\theta) \space \space \space \space{a \le \thet
 
 This is implemented using the `err.interv` function below:
 
-``` {r err.interv.echo}
-  err.interv
+``` {r err.interv.echo, eval = F}
+  function(par, exp.par, tmin, tmax, a = F) {
+  # Piece the times back together and determine the difference between them
+    times <- c(tmin, par, tmax)
+    deltat <- diff(times)
+  # If exponential parameters describe an absorption curve
+  # Determine the maximum second derivative of y for the beginning and end of 
+  # each interval
+    if (a) {
+      all.secd <- abs(pred.sumexp(exp.par, times, 2))
+      secd <- c(NULL)
+      for (i in 1:(length(times)-1)) {
+        secd[i] <- all.secd[which(all.secd == max(all.secd[c(i, i + 1)]))]
+      }
+  # If exponential parameters describe a bolus curve
+  # Use first value for second derivative as it will always be larger
+    } else {
+      secd <- pred.sumexp(exp.par, times[-length(times)], 2)
+    }
+  # Determine the sum of squared trapezoidal error
+  # Sum of squares improves optim stability over using abs()
+    err <- deltat^3*secd/12
+    sum(err^2)
+  }
 ```
 
 The current implementation of determining trapezoidal error does not use 
@@ -418,9 +450,9 @@ This can be used to make a final output.
     optimisedInterval = c(0, temp3$par, 24)
   ))
   plotdata <- data.frame(
-    time = data1$time,
-    cobs = data1$conc,
-    pred = pred.sumexp(temp2$par, data[, 1])
+    time = data2$time,
+    cobs = data2$conc,
+    pred = pred.sumexp(temp2$par, data2[, 1])
   )
   ylim <- c(0, 1.1*max(plotdata$cobs))
   xlim <- c(0, 24)
@@ -432,5 +464,39 @@ This can be used to make a final output.
   plotobj <- plotobj + geom_vline(xintercept = c(0, temp3$par, 24), colour = "green4", linetype = "dashed")
   plotobj <- plotobj + scale_y_continuous("Concentration (mg/mL)\n", lim = ylim)
   plotobj <- plotobj + scale_x_continuous("\nTime after dose (hrs)", lim = xlim)
-  print(plotobj)
+  suppressWarnings(print(plotobj))
+```
+
+Example output for an absorption curve.
+
+```{r final.out.abs, echo = F}
+  list.sumexp1 <- optim.sumexp(data1, oral = T)
+  best.sumexp1 <- chisq.sumexp(list.sumexp1)
+  
+  nobs <- 8
+  tlast <- 48
+  time.seq <- c(0, exp(seq(-2.5, 0, length.out = nobs))*tlast)
+  interv1 <- optim.interv(time.seq, best.sumexp1$par)
+  
+  print(list(
+    sumexpParameters = best.sumexp1$par,
+    optimisedInterval = c(0, interv1$par, 24)
+  ))
+  
+  plotdata <- data.frame(
+    time = data1$time,
+    cobs = data1$conc,
+    pred = pred.sumexp(best.sumexp1$par, data1[, 1])
+  )
+  ylim <- c(0, 1.1*max(plotdata$cobs))
+  xlim <- c(0, 48)
+  plotobj <- NULL
+  plotobj <- ggplot(data = plotdata)
+  plotobj <- plotobj + ggtitle("Predicted and Observed vs. Time")
+  plotobj <- plotobj + geom_point(aes(x = time, y = cobs))
+  plotobj <- plotobj + geom_line(aes(x = time, y = pred), colour = "red")
+  plotobj <- plotobj + geom_vline(xintercept = c(0, interv1$par, 48), colour = "green4", linetype = "dashed")
+  plotobj <- plotobj + scale_y_continuous("Concentration (mg/mL)\n", lim = ylim)
+  plotobj <- plotobj + scale_x_continuous("\nTime after dose (hrs)", lim = xlim)
+  suppressWarnings(print(plotobj))
 ```
