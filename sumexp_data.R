@@ -8,7 +8,7 @@
 #   twodata.abs - two compartment kinetics w/ absorption
 #   thrdata.abs - three compartment kinetics w/ absorption
 # -----------------------------------------------------------------------------
-  time.samp <- seq(0, 48, by = 2)
+  time.samp <- seq(0, 48, by = 0.1)
 # One Compartment Kinetics
   onedata <- data.frame(
     time = time.samp,
@@ -36,7 +36,7 @@
 # One Compartment Kinetics w/ Absorption
   onedata.abs <- data.frame(
     time = time.samp,
-    line1 = -0.2*time.samp + 4,
+    line1 = -0.4*time.samp + 4,
     line2 = -0.1*time.samp + 4
   )
   onedata.abs$sumexp <- with(onedata.abs, exp(line2) - exp(line1))
@@ -46,17 +46,17 @@
     time = time.samp,
     line1 = -0.4*time.samp + 4,
     line2 = -0.2*time.samp + log(exp(4)*0.8),
-    line3 = -0.02*time.samp + log(exp(4)*0.2)
+    line3 = -0.01*time.samp + log(exp(4)*0.2)
   )
   twodata.abs$sumexp <- with(twodata.abs, exp(line2) + exp(line3) - exp(line1))
   #with(twodata.abs, plot(time, log(sumexp)))
 # Three Compartment Kinetics w/ Absorption
   thrdata.abs <- data.frame(
     time = time.samp,
-    line1 = -0.4*time.samp + 4,
-    line2 = -0.2*time.samp + log(exp(4)*0.7),
-    line3 = -0.02*time.samp + log(exp(4)*0.05),
+    line1 = -0.8*time.samp + 4,
+    line2 = -0.5*time.samp + log(exp(4)*0.6),
+    line3 = -0.001*time.samp + log(exp(4)*0.15),
     line4 = -0.08*time.samp + log(exp(4)*0.25)
   )
   thrdata.abs$sumexp <- with(thrdata.abs, exp(line2) + exp(line3) + exp(line4) - exp(line1))
-  #with(thrdata.abs, plot(time, log(sumexp)))
+  #with(thrdata.abs, plot(time[-1], log(sumexp)[-1]))

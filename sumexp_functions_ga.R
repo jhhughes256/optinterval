@@ -93,14 +93,14 @@
   }
 
 # Trapezoidal error function for interval optimisation
-  err.interv <- function(par, exp.par, tmin, tmax, a = F) {
-    times <- c(tmin, par, tmax)
+  err.interv <- function(par, exp.par, tfirst, tlast, tmax = NULL, a = F) {
+    times <- c(tfirst, par, tlast, tmax)
     deltat <- diff(times)
     if (a) {
       all.secd <- abs(pred.sumexp(exp.par, times, 2))
       secd <- c(NULL)
       for (i in 1:(length(times)-1)) {
-        secd[i] <- all.secd[which(all.secd == max(all.secd[c(i, i + 1)]))
+        secd[i] <- all.secd[which(all.secd == max(all.secd[c(i, i + 1)]))][1]
       }
     } else {
       secd <- pred.sumexp(exp.par, times[-length(times)], 2)
@@ -110,9 +110,10 @@
   }
 
 # Interval optimising function
-  optim.interv <- function(times, fit.par) {
+  optim.interv <- function(times, fit.par, tmax = NULL) {
     x <- times[order(times)]
     init.par <- x[-c(1, length(x))]
+    if (!is.null(tmax)) init.par <- init.par[-length(init.par)]
     xmin <- min(x)
     xmax <- max(x)
     absorp <- ifelse((length(fit.par) %% 2) != 0, T, F)
@@ -121,7 +122,8 @@
       err.interv,
       method = "L-BFGS-B", control = c(maxit = 500),
       lower = xmin, upper = xmax,
-      exp.par = fit.par, tmin = xmin + 0.01, tmax = xmax - 0.01, a = absorp
+      exp.par = fit.par, tfirst = xmin + 0.01, tlast = xmax - 0.01, tmax = tmax,
+      a = absorp
     )
     return(res)
   }
