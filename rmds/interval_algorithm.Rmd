@@ -52,7 +52,7 @@ _intervals used in the determination of AUC using trapezoidal integration_
     plotdata <- data.frame(
       time = data$time,
       cobs = data$conc,
-      pred = pred.sumexp(res[-length(res)], data$time, 0)
+      pred = pred.sumexp(res, data$time, 0)
     )
     ylim <- c(0, 1.1*max(plotdata$cobs))
     xlim <- c(0, max(plotdata$time))
@@ -94,7 +94,7 @@ Basic pharmacokinetic models can be described using the sum of one or
 more exponential terms. For example a one-compartment pharmacokinetic model is
 described using:
 $$C=C_0e^{-\frac{CL}{Vd}t}$$
-If we let $-\frac{CL}{Vd}=m$ and $c=lny_0$ then this can be written as:
+If we let $m=-\frac{CL}{Vd}$ and $c=lny_0$ then this can be written as:
 $$y=e^ce^{mx}$$
 $$y=e^{mx+c}$$
 
@@ -215,13 +215,13 @@ number of exponentials `nexp` that the algorithm will try to optimise.
       # First use genetic algorithms to determine initial parameters
         gares <- ga("real-valued",
           mle.sumexp, x = x, y = y, ga = T, sigma = 0.01,
-          min = c(rep(lmres[2]*50, i + oral), rep(lmres[1]-2, i)),
-          max = c(rep(lmres[2]/50, i + oral), rep(lmres[1]+2, i)),
-          selection = gareal_lrSelection,
-          crossover = gareal_spCrossover,
-          mutation = gareal_raMutation,
-          maxiter = 50,
-          popSize = 250
+          min = c(rep(lmres[2]*50, i + oral), rep(lmres[1]-2, i)),# lower bound
+          max = c(rep(lmres[2]/50, i + oral), rep(lmres[1]+2, i)),# upper bound
+          selection = gareal_lrSelection,  # linear-rank selection
+          crossover = gareal_spCrossover,  # single-point crossover
+          mutation = gareal_raMutation,  # random mutation
+          maxiter = 50,  # maximum iterations
+          popSize = 250  # population per iteration
         )
       # Then optimise the curve using standard hill-climbing optimisation
       # Matrix index to prevent errors when ga outputs multiple solutions
@@ -480,7 +480,7 @@ Example output for an absorption curve.
   
   print(list(
     sumexpParameters = best.sumexp1$par,
-    optimisedInterval = c(0, interv1$par, 24)
+    optimisedInterval = c(0, interv1$par, 48)
   ))
   
   plotdata <- data.frame(
