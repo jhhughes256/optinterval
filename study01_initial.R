@@ -23,8 +23,8 @@
   #theme_update(plot.title = element_text(hjust = 0.5))
 
 # Source scripts to set up environment
-  source(paste(git.dir, reponame, "sumexp_functions_ga.R", sep = "/"))
-  source(paste(git.dir, reponame, "sumexp_data.R", sep = "/"))
+  source(paste(git.dir, reponame, "sumexp", "sumexp_functions_ga.R", sep = "/"))
+  source(paste(git.dir, reponame, "sumexp", "sumexp_data.R", sep = "/"))
 
 # -----------------------------------------------------------------------------
 # Comparison of interval-choosing methods
