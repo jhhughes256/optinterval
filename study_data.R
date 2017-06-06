@@ -1,12 +1,12 @@
 # Sum of exponential data for sourcing
 # -----------------------------------------------------------------------------
 # The datasets in order are:
-#   onedata - one compartment kinetics
-#   twodata - two compartment kinetics
-#   thrdata - three compartment kinetics
-#   onedata.abs - one compartment kinetics w/ absorption
-#   twodata.abs - two compartment kinetics w/ absorption
-#   thrdata.abs - three compartment kinetics w/ absorption
+#   d1b - one compartment kinetics given iv
+#   d2b - two compartment kinetics given iv
+#   d3b - three compartment kinetics given iv
+#   d1a - one compartment kinetics given orally
+#   d2a - two compartment kinetics given orally
+#   d3a - three compartment kinetics given orally
 # -----------------------------------------------------------------------------
   time.samp <- seq(0, 48, by = 0.1)
 # One Compartment Kinetics

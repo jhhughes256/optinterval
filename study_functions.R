@@ -171,3 +171,21 @@
 #    else auc[i-1] <- dC*h/log(C[i-1]/C[i])
 #    return(sum(auc))
 #  }
+
+# Plot random data
+  plot.rdata <- function(data, t, n, interv) {
+    plotdata <- data.frame(
+      id = rep(1:n, each = length(t)),
+      time = rep(t, times = n),
+      dv = as.vector(data)
+    )
+    plotobj <- NULL
+    plotobj <- ggplot(data = plotdata)
+    plotobj <- plotobj + ggtitle("Random Concentration Time Curves")
+    plotobj <- plotobj + geom_line(aes(x = time, y = dv), colour = "red")
+    plotobj <- plotobj + geom_vline(xintercept = interv, colour = "green4", linetype = "dashed")
+    plotobj <- plotobj + scale_y_continuous("Concentration (mg/mL)\n")
+    plotobj <- plotobj + scale_x_continuous("\nTime after dose (hrs)")
+    plotobj <- plotobj + facet_wrap(~id, ncol = round(sqrt(n)), scales = "free")
+    return(plotobj)
+  }
