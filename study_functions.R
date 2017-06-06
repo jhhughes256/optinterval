@@ -20,6 +20,18 @@
     return(y)
   }
 
+# Version without loops
+#  pred.sumexp <- function(p, x, d = 0) {
+#    l <- length(p)
+#    a <- ifelse(l %% 2 == 0, F, T)
+#    n <- ceiling(l/2)
+#    m <- p[1:(n-a)]
+#    b <- p[(n+1):l]
+#    y <- colSums(exp(b)*outer(m, x, function(m, x) m^d*exp(m*x))) -
+#      a*m[n]*exp(m[n]*x)*sum(exp(b))
+#    return(y)
+#  }
+
 # Maximum likelihood estimation function for parameter optimisation
   mle.sumexp <- function(par, x, y, sigma, ga = F) {
     z <- ifelse(ga, 1, -1)
@@ -30,15 +42,14 @@
 
 # Fit sum of exponentials to curve for different numbers of exponentials
   optim.sumexp <- function(data, oral = F, nexp = 3) {
-    x <- data[which(data[, 2] != 0), 1]
-    y <- data[which(data[, 2] != 0), 2]
+    x <- data[which(data[, 2] > 0 & data[, 1] != 0), 1]
+    y <- data[which(data[, 2] > 0 & data[, 1] != 0), 2]
     opt.par <- list(NULL)
     opt.val <- list(NULL)
     opt.gra <- list(NULL)
     opt.con <- list(NULL)
     opt.mes <- list(NULL)
     lmres <- unname(lm(log(y) ~ x)$coefficients)
-
     for (i in 1:nexp) {
       if (i == 1 & !oral) {
         optres <- list(
@@ -55,7 +66,8 @@
           crossover = gareal_spCrossover,
           mutation = gareal_raMutation,
           maxiter = 50,
-          popSize = 250
+          popSize = 250,
+          monitor = F
         )
         optres <- optim(
           gares@solution[1, ],
@@ -137,8 +149,8 @@
   }
 
 # Determine auc given a set of intervals
-  auc.interv <- function(times, fit.par, log = F) {
-    C <- pred.d1a(times, fit.par)
+  auc.interv <- function(times, fit.par, fn, log = F) {
+    C <- do.call(fn, list(x = times, p = fit.par))
     auc <- c(NULL)
     for (i in 2:length(C)) {
       h <- times[i] - times[i-1]
@@ -148,3 +160,14 @@
     }
     return(sum(auc))
   }
+
+# Without for loop
+#  auc.interv <- function(times, fit.par, fn, log = F) {
+#    C <- do.call(fn, list(x = times, p = fit.par))
+#    h <- diff(times)
+#    EC <- psum(C[-1], C[-length(C)])
+#    dC <- diff(-C)
+#    if (!log) auc <- EC*h/2
+#    else auc[i-1] <- dC*h/log(C[i-1]/C[i])
+#    return(sum(auc))
+#  }

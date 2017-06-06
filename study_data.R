@@ -19,6 +19,7 @@
     conc = pred.d1b(time.samp, d1b.p)
   )
   #with(d1b, plot(time, log(conc)))
+  d1b.t <- c(0, 0.5, 1, 2, 4, 8, 12, 16, 24)
 # Two Compartment Kinetics
   pred.d2b <- function(x, p) {
     exp(p[1]*x + p[3]) + exp(p[2]*x + p[4])
@@ -29,16 +30,18 @@
     conc = pred.d2b(time.samp, d2b.p)
   )
   #with(d2b, plot(time, log(conc)))
+  d2b.t <- c(0, 0.5, 1, 3, 5, 8, 12, 16, 24)
 # Three Compartment Kinetics
   pred.d3b <- function(x, p) {
     exp(p[1]*x + p[4]) + exp(p[2]*x + p[5]) + exp(p[3]*x + p[6])
   }
-  d3b.p <- c(-0.5, -0.05, -0.15, 6, 3.5, 4.7)
-  thrdata <- data.frame(
+  d3b.p <- c(-0.4, -0.01, -0.1, 6, 4.1, 4.7)
+  d3b <- data.frame(
     time = time.samp,
     conc = pred.d3b(time.samp, d3b.p)
   )
   #with(d3b, plot(time, log(conc)))
+  d3b.t <- c(0, 0.5, 1, 2, 4, 8, 12, 16, 24)
 # One Compartment Kinetics w/ Absorption
   pred.d1a <- function(x, p) {
     exp(p[1]*x + p[3]) - exp(p[2]*x + p[3])
@@ -49,9 +52,10 @@
     conc = pred.d1a(time.samp, d1a.p)
   )
   #with(d1a plot(time, log(conc)))
+  d1a.t <- c(0, 0.5, 1, 3, 5, 7, 10, 16, 24)
 # Two Compartment Kinetics w/ Absorption
   pred.d2a <- function(x, p) {
-    exp(p[1]*x + p[4]) + exp(p[2]*x + p[5]) - exp(p[3]*x + sum(p[4], p[5]))
+    exp(p[1]*x + p[4]) + exp(p[2]*x + p[5]) - exp(p[3]*x + log(sum(exp(p[4]), exp(p[5]))))
   }
   d2a.p <- c(-0.2, -0.01, -0.4, log(exp(4)*0.8), log(exp(4)*0.2))
   d2a <- data.frame(
@@ -59,9 +63,10 @@
     conc = pred.d2a(time.samp, d2a.p)
   )
   #with(d2a, plot(time, log(conc)))
+  d2a.t <- c(0, 0.5, 1, 3, 5, 8, 12, 16, 24)
 # Three Compartment Kinetics w/ Absorption
   pred.d3a <- function(x, p) {
-    exp(p[1]*x + p[5]) + exp(p[2]*x + p[6]) + exp(p[3]*x + p[7]) - exp(p[4]*x + sum(p[5], p[6], p[7]))
+    exp(p[1]*x + p[5]) + exp(p[2]*x + p[6]) + exp(p[3]*x + p[7]) - exp(p[4]*x + log(sum(exp(p[5]), exp(p[6]), exp(p[7]))))
   }
   d3a.p <- c(-0.5, -0.08, -0.001, -0.8, log(exp(4)*0.6), log(exp(4)*0.25), log(exp(4)*0.15))
   d3a <- data.frame(
@@ -69,3 +74,4 @@
     conc = pred.d3a(time.samp, d3a.p)
   )
   #with(d3a, plot(time[-1], log(conc)[-1]))
+  d3a.t <- c(0, 0.5, 1.5, 3, 5, 8, 12, 16, 24)

@@ -28,93 +28,61 @@
 
 # -----------------------------------------------------------------------------
 # Set basic parameters
-  nobs <- 8
+  data.names <- paste0("d", as.vector(outer(1:3, c("a", "b"), paste0)))
+  par.names <- paste(data.names, "p", sep = ".")
+  fn.names <- paste("pred", data.names, sep = ".")
+  t2.names <- paste(data.names, "t", sep = ".")
 
-  function(data, par, fn, nobs, t2, sdev = 0.05, tlast = 24) {
+  study.fn <- function(data, par, fn, nobs, t2, sdev = 0.05, tlast = 24, logauc = F) {
+    absorp <- ifelse((length(par) %% 2) != 0, T, F)
     t1 <- seq(0, tlast, length.out = nobs+1)
     e1 <- 1 + rnorm(n = length(t1), mean = 0, sd = sdev)
     subd <- data.frame(
       time = t1,
       conc = with(data, conc[time %in% t1])*e1
     )
-    exp.par <- chisq.sumexp(optim.sumexp(subd, oral = T))$par
-    int.t3 <- optim.interv(t1, exp.par)
+    fit.par <- chisq.sumexp(optim.sumexp(subd, oral = absorp))$par
+    int.t3 <- optim.interv(t1, fit.par)
     t3 <- c(0, round(int.t3$par, 1), tlast)
 
-    t4.tmax <- tmax.sumexp(exp.par)
-    int.t4 <- optim.interv(t1, exp.par, tmax = t4.tmax)
+    t4.tmax <- tmax.sumexp(fit.par)
+    int.t4 <- optim.interv(t1, fit.par, tmax = t4.tmax)
     nr.t4 <- c(0, round(int.t4$par, 1), t4.tmax, tlast)
     t4 <- nr.t4[order(nr.t4)]
 
-    auc <- data.frame(
-      true = integrate(fn, 0, tlast, p = par),
-      sumexp = ,
-      basic = ,
-      user = ,
-      optint = ,
-      optintwCmax =
+    fit.fn <- paste0("pred.d", floor(length(fit.par)/2), ifelse(absorp, "a", "b"))
+    auc <- c(
+      true = integrate(fn, 0, tlast, p = par)$value,
+      sumexp = integrate(get(fit.fn), 0, tlast, p = fit.par)$value,
+      basic = auc.interv(t1, par, fn, log = logauc),
+      user = auc.interv(t2, par, fn, log = logauc),
+      optint = auc.interv(t3, par, fn, log = logauc),
+      optintwCmax = auc.interv(t4, par, fn, log = logauc)
     )
-    tmax <- data.frame(
-      true = ,
-      basic = ,
-      user = ,
-      optint = ,
-      optintwCmax =
+    cmax <- c(
+      true = pred.sumexp(par, tmax.sumexp(par)),
+      basic = max(pred.sumexp(par, t1)),
+      user = max(pred.sumexp(par, t2)),
+      optint = max(pred.sumexp(par, t3)),
+      optintwCmax = max(pred.sumexp(par, t4))
     )
-    cmax <- data.frame(
-      true = ,
-      basic = ,
-      user = ,
-      optint = ,
-      optintwCmax =
+    tmax <- c(
+      true = tmax.sumexp(par),
+      basic = t1[which(pred.sumexp(par, t1) == cmax["basic"])],
+      user = t2[which(pred.sumexp(par, t2) == cmax["user"])],
+      optint = t3[which(pred.sumexp(par, t3) == cmax["optint"])],
+      optintwCmax = t4[which(pred.sumexp(par, t4) == cmax["optintwCmax"])]
     )
+    return(list(auc = auc, cmax = cmax, tmax = tmax))
   }
 
-
-
-# Determine true auc_{0-tlast}, c_max and t_max
-  pred.d1a <- function(x, p) {
-    exp(p[1]*x + p[3]) - exp(p[2]*x + p[3])
+  fin.res <- list(NULL)
+  for (i in 1:6) {
+    fin.res[[i]] <- list(
+      data = data.names[i],
+      result = study.fn(get(data.names[i]),
+        par = get(par.names[i]), fn = get(fn.names[i]),
+        t2 = get(t2.names[i]), nobs = 8
+      )
+    )
   }
-  d1a.auc <- list(
-    true = integrate(pred.d1a, 0, tlast, p = c(-0.1, -0.4, 4)),
-    sumexp = integrate(pred.d1a, 0, tlast, p = d1a.sumexp1)
-  )
-  d1a.tmax <- list(
-    true = tmax.sumexp(c(-0.1, -0.4, 4))
-  )
-  d1a.cmax <- list(
-    true = pred.sumexp(c(-0.1, -0.4, 4), tmax.true)
-  )
-
-  auc.interv <- function(times, fit.par, log = F) {
-    C <- pred.d1a(times, fit.par)
-    auc <- c(NULL)
-    for (i in 2:length(C)) {
-      h <- times[i] - times[i-1]
-      dC <- C[i-1] - C[i]
-      if (log & dC > 0) auc[i-1] <- dC*h/log(C[i-1]/C[i])
-      else auc[i-1] <- (C[i-1] + C[i])*h/2
-    }
-    return(sum(auc))
-  }
-
-  d1a.auc$t1 <- auc.interv(d1a.t1, c(-0.1, -0.4, 4))
-  d1a.auc$t2 <- auc.interv(d1a.t2, c(-0.1, -0.4, 4))
-  d1a.auc$t3 <- auc.interv(d1a.t3, c(-0.1, -0.4, 4))
-  d1a.auc$t4 <- auc.interv(d1a.t4, c(-0.1, -0.4, 4))
-
-  d1a.auc$lnt1 <- auc.interv(d1a.t1, c(-0.1, -0.4, 4), log = T)
-  d1a.auc$lnt2 <- auc.interv(d1a.t2, c(-0.1, -0.4, 4), log = T)
-  d1a.auc$lnt3 <- auc.interv(d1a.t3, c(-0.1, -0.4, 4), log = T)
-  d1a.auc$lnt4 <- auc.interv(d1a.t4, c(-0.1, -0.4, 4), log = T)
-
-  d1a.cmax$t1 <- max(pred.sumexp(c(-0.1, -0.4, 4), d1a.t1))
-  d1a.cmax$t2 <- max(pred.sumexp(c(-0.1, -0.4, 4), d1a.t2))
-  d1a.cmax$t3 <- max(pred.sumexp(c(-0.1, -0.4, 4), d1a.t3))
-  d1a.cmax$t4 <- max(pred.sumexp(c(-0.1, -0.4, 4), d1a.t4))
-
-  d1a.tmax$t1 <- d1a.t1[which(pred.sumexp(c(-0.1, -0.4, 4), d1a.t1) == d1a.cmax.t1)]
-  d1a.tmax$t2 <- d1a.t2[which(pred.sumexp(c(-0.1, -0.4, 4), d1a.t2) == d1a.cmax.t2)]
-  d1a.tmax$t3 <- d1a.t3[which(pred.sumexp(c(-0.1, -0.4, 4), d1a.t3) == d1a.cmax.t3)]
-  d1a.tmax$t4 <- d1a.t4[which(pred.sumexp(c(-0.1, -0.4, 4), d1a.t4) == d1a.cmax.t4)]

@@ -88,7 +88,7 @@
     true = tmax.sumexp(c(-0.1, -0.4, 4))
   )
   d1a.cmax <- list(
-    true = pred.sumexp(c(-0.1, -0.4, 4), tmax.true)
+    true = pred.sumexp(c(-0.1, -0.4, 4), d1a.tmax$true)
   )
 
   auc.interv <- function(times, fit.par, log = F) {
