@@ -26,6 +26,7 @@
   theme_bw2 <- theme_set(theme_bw(base_size = 14))
   theme_update(plot.title = element_text(hjust = 0.5))
   library(plyr)
+  library(grid)
 
 # Source scripts and r objects to set up environment
   source(paste(git.dir, reponame, "study_functions.R", sep = "/"))
@@ -35,8 +36,8 @@
   d2b <- readRDS(paste(git.dir, reponame, "d2b-broad.rds", sep = "/"))
   d3b <- readRDS(paste(git.dir, reponame, "d3b-broad.rds", sep = "/"))
   d1a <- readRDS(paste(git.dir, reponame, "d1a-broad.rds", sep = "/"))
-  #d2a <- readRDS(paste(git.dir, reponame, "d2a-broad.rds", sep = "/"))
-  #d3a <- readRDS(paste(git.dir, reponame, "d3a-broad.rds3, sep = "/"))
+  d2a <- readRDS(paste(git.dir, reponame, "d2a-broad.rds", sep = "/"))
+  d3a <- readRDS(paste(git.dir, reponame, "d3a-broad.rds", sep = "/"))
 
 # -----------------------------------------------------------------------------
 # Data structure
@@ -44,12 +45,12 @@
 # names(d[[#]]) -> "data" "result"
 # names(d[[#]]$result) -> "auc" "cmax" "tmax"
 
-  data.names <- c("d2b", "d3b", "d1a")  #, "d2a", "d3a")
+  data.names <- c("d2b", "d3b", "d1a", "d2a", "d3a")
   slot.names <- c("auc", "cmax", "tmax")
 
   res <- data.frame(NULL)
   plotdata <- data.frame(NULL)
-  for (i in 1:3) {  # 1:5) {
+  for (i in 1:5) {
     r.out <- data.frame(NULL)
     d.out <- data.frame(NULL)
     for (j in 1:3) {
@@ -72,13 +73,156 @@
     plotdata <- rbind(plotdata, d.out)
   }
 
-  subplot <- plotdata[plotdata$metric == "auc", ]
-  subplot$data <- as.factor(subplot$data)
-  subplot$type <- as.factor(subplot$type)
+# -----------------------------------------------------------------------------
 
-  plotobj <- ggplot(subplot, aes(x = type, y = prop))
-  plotobj <- plotobj + geom_boxplot()
-  plotobj <- plotobj + facet_wrap(~data)
-  plotobj
+  box.plot.fn <- function(metric, data, x, zoom, layout = NULL) {
+    subplot <- plotdata[plotdata$metric == metric & plotdata$data == data, ]
+    subplot$type <- as.factor(subplot$type)
+    levels(subplot$type) <- c("Basic", "Optint", "Optint w/ Cmax")
 
-  plotobj + stat_summary(fun.y = mean, geom = "point", shape = 4, size = 4)
+    plotobj <- ggplot(subplot, aes(x = type, y = prop))
+    plotobj <- plotobj + geom_hline(yintercept = 1, color = "green4", linetype = "dashed")
+    plotobj <- plotobj + geom_boxplot()
+    plotobj <- plotobj + ggtitle(paste("Data:", data, "- Metric:", metric))
+    plotobj <- plotobj + xlab("\nMethod")
+    plotobj <- plotobj + ylab("Method/Reference Ratio\n")
+    if (zoom) {
+      ylim.box <- boxplot.stats(subplot$prop)$stats[c(1, 5)]
+      plotobj <- plotobj + coord_cartesian(ylim = ylim.box)
+    }
+    if (x) plotobj <- plotobj + stat_summary(fun.y = mean, geom = "point", shape = 4, size = 4)
+    if (is.null(layout)) print(plotobj)
+    else print(plotobj, vp = layout)
+  }
+
+  forest.plot.fn <- function(metric, data, layout = NULL) {
+    subplot <- res[res$metric == metric & res$data == data, ]
+    subplot$type <- factor(subplot$type, levels = rev(subplot$type))
+    levels(subplot$type) <- c("Optint w/ Cmax", "Optint", "Basic")
+    subplot$median <- as.numeric(subplot$median)
+    subplot$q025 <- as.numeric(subplot$q025)
+    subplot$q25 <- as.numeric(subplot$q25)
+    subplot$q75 <- as.numeric(subplot$q75)
+    subplot$q975 <- as.numeric(subplot$q975)
+
+    plotobj <- ggplot(subplot, aes(x = type, y = median))
+    plotobj <- plotobj + geom_linerange(aes(ymin = q025, ymax = q975), color = "red")
+    plotobj <- plotobj + geom_pointrange(aes(ymin = q25, ymax = q75))
+    plotobj <- plotobj + geom_hline(yintercept = 1, lty = 2, color = "green4")
+    plotobj <- plotobj + ggtitle(paste("Data:", data, "- Metric:", metric))
+    plotobj <- plotobj + xlab("\nMethod")
+    plotobj <- plotobj + scale_y_continuous("Method/Reference Ratio\n")
+    plotobj <- plotobj + coord_flip()
+    if (is.null(layout)) print(plotobj)
+    else print(plotobj, vp = layout)
+  }
+
+# -----------------------------------------------------------------------------
+
+  vplayout <- function(x, y) viewport(layout.pos.row = x, layout.pos.col = y)
+  grid.newpage()
+  pushViewport(viewport(layout = grid.layout(1,3)))
+
+  box.plot.fn("auc", "d1a", F, T, vplayout(1,1))
+  box.plot.fn("cmax", "d1a", F, T, vplayout(1,2))
+  box.plot.fn("tmax", "d1a", F, T, vplayout(1,3))
+
+  dev.off()
+
+  vplayout <- function(x, y) viewport(layout.pos.row = x, layout.pos.col = y)
+  grid.newpage()
+  pushViewport(viewport(layout = grid.layout(3, 1)))
+
+  forest.plot.fn("auc", "d1a", vplayout(1,1))
+  forest.plot.fn("cmax", "d1a", vplayout(2,1))
+  forest.plot.fn("tmax", "d1a", vplayout(3,1))
+
+  dev.off()
+
+# -----------------------------------------------------------------------------
+
+  vplayout <- function(x, y) viewport(layout.pos.row = x, layout.pos.col = y)
+  grid.newpage()
+  pushViewport(viewport(layout = grid.layout(1,3)))
+
+  box.plot.fn("auc", "d2a", F, T, vplayout(1,1))
+  box.plot.fn("cmax", "d2a", F, T, vplayout(1,2))
+  box.plot.fn("tmax", "d2a", F, T, vplayout(1,3))
+
+  dev.off()
+
+  vplayout <- function(x, y) viewport(layout.pos.row = x, layout.pos.col = y)
+  grid.newpage()
+  pushViewport(viewport(layout = grid.layout(3, 1)))
+
+  forest.plot.fn("auc", "d2a", vplayout(1,1))
+  forest.plot.fn("cmax", "d2a", vplayout(2,1))
+  forest.plot.fn("tmax", "d2a", vplayout(3,1))
+
+  dev.off()
+
+# -----------------------------------------------------------------------------
+
+  vplayout <- function(x, y) viewport(layout.pos.row = x, layout.pos.col = y)
+  grid.newpage()
+  pushViewport(viewport(layout = grid.layout(1,3)))
+
+  box.plot.fn("auc", "d3a", F, T, vplayout(1,1))
+  box.plot.fn("cmax", "d3a", F, T, vplayout(1,2))
+  box.plot.fn("tmax", "d3a", F, T, vplayout(1,3))
+
+  dev.off()
+
+  vplayout <- function(x, y) viewport(layout.pos.row = x, layout.pos.col = y)
+  grid.newpage()
+  pushViewport(viewport(layout = grid.layout(3, 1)))
+
+  forest.plot.fn("auc", "d3a", vplayout(1,1))
+  forest.plot.fn("cmax", "d3a", vplayout(2,1))
+  forest.plot.fn("tmax", "d3a", vplayout(3,1))
+
+  dev.off()
+
+# -----------------------------------------------------------------------------
+
+  vplayout <- function(x, y) viewport(layout.pos.row = x, layout.pos.col = y)
+  grid.newpage()
+  pushViewport(viewport(layout = grid.layout(1,3)))
+
+  box.plot.fn("auc", "d2b", F, T, vplayout(1,1))
+  box.plot.fn("cmax", "d2b", F, T, vplayout(1,2))
+  box.plot.fn("tmax", "d2b", F, T, vplayout(1,3))
+
+  dev.off()
+
+  vplayout <- function(x, y) viewport(layout.pos.row = x, layout.pos.col = y)
+  grid.newpage()
+  pushViewport(viewport(layout = grid.layout(3, 1)))
+
+  forest.plot.fn("auc", "d2b", vplayout(1,1))
+  forest.plot.fn("cmax", "d2b", vplayout(2,1))
+  forest.plot.fn("tmax", "d2b", vplayout(3,1))
+
+  dev.off()
+
+# -----------------------------------------------------------------------------
+
+  vplayout <- function(x, y) viewport(layout.pos.row = x, layout.pos.col = y)
+  grid.newpage()
+  pushViewport(viewport(layout = grid.layout(1,3)))
+
+  box.plot.fn("auc", "d3b", F, T, vplayout(1,1))
+  box.plot.fn("cmax", "d3b", F, T, vplayout(1,2))
+  box.plot.fn("tmax", "d3b", F, T, vplayout(1,3))
+
+  dev.off()
+
+  vplayout <- function(x, y) viewport(layout.pos.row = x, layout.pos.col = y)
+  grid.newpage()
+  pushViewport(viewport(layout = grid.layout(3, 1)))
+
+  forest.plot.fn("auc", "d2b", vplayout(1,1))
+  forest.plot.fn("cmax", "d2b", vplayout(2,1))
+  forest.plot.fn("tmax", "d2b", vplayout(3,1))
+
+  dev.off()

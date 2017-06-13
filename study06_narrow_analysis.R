@@ -26,6 +26,7 @@
   theme_bw2 <- theme_set(theme_bw(base_size = 14))
   theme_update(plot.title = element_text(hjust = 0.5))
   library(plyr)
+  library(grid)
 
 # Source scripts and r objects to set up environment
   source(paste(git.dir, reponame, "study_functions.R", sep = "/"))
@@ -33,6 +34,12 @@
 
 # Source data
   d1a <- readRDS(paste(git.dir, reponame, "d1a-narrow.rds", sep = "/"))
+  d1a.user <- readRDS(paste(git.dir, reponame, "d1a-narrow-user.rds", sep = "/"))
+
+  user.auc <- unique(with(d1a.user$auc, user/true))
+  user.cmax <- unique(with(d1a.user$cmax, user/true))
+  user.tmax <- unique(with(d1a.user$tmax, user/true))
+  c(user.auc, user.cmax, user.tmax)
 
 # -----------------------------------------------------------------------------
 # Data structure
@@ -59,34 +66,64 @@
   }
 
 # -----------------------------------------------------------------------------
-  res.plot.fn <- function(metric, user, plot) {
+  box.plot.fn <- function(metric, user, x, zoom, layout = NULL) {
     subplot <- plotdata[plotdata$metric == metric & plotdata$type != "bas", ]
     subplot$type <- as.factor(subplot$type)
+    levels(subplot$type) <- c("Basic", "Optint", "Optint w/ Cmax")
 
     plotobj <- ggplot(subplot, aes(x = type, y = prop))
     plotobj <- plotobj + geom_boxplot()
     plotobj <- plotobj + geom_hline(yintercept = 1, color = "green4", linetype = "dashed")
     plotobj <- plotobj + geom_hline(yintercept = user, color = "red", linetype = "dashed")
-
-    if (plot == 1) {
+    plotobj <- plotobj + ggtitle(paste("Metric:", metric))
+    plotobj <- plotobj + xlab("\nMethod")
+    plotobj <- plotobj + ylab("Method/Reference Ratio\n")
+    if (zoom) {
       lim.check <- c(boxplot.stats(subplot$prop)$stats[c(1, 5)], user)
       ylim.box <- c(min(lim.check), max(lim.check))
       plotobj <- plotobj + coord_cartesian(ylim = ylim.box)
-      plotobj
-    } else if (plot == 2) {
-      plotobj <- plotobj + stat_summary(fun.y = mean, geom = "point", shape = 4, size = 4)
-      plotobj
-    } else {
-      plotobj
     }
+    if (x) {
+      plotobj <- plotobj + stat_summary(fun.y = mean, geom = "point", shape = 4, size = 4)
+    }
+    if (is.null(layout)) print(plotobj)
+    else print(plotobj, vp = layout)
   }
 
-  res.plot.fn("auc", 1.016367, 0)
-  res.plot.fn("auc", 1.016367, 1)
-  res.plot.fn("auc", 1.016367, 2)
-  res.plot.fn("cmax", 0.9905159, 0)
-  res.plot.fn("cmax", 0.9905159, 1)
-  res.plot.fn("cmax", 0.9905159, 2)
-  res.plot.fn("tmax", 0.8571429, 0)
-  res.plot.fn("tmax", 0.8571429, 1)
-  res.plot.fn("tmax", 0.8571429, 2)
+  forest.plot.fn <- function(metric, user, zoom, layout = NULL) {
+    subplot <- res[res$metric == metric & res$type != "bas", ]
+    subplot$type <- factor(subplot$type, levels = rev(subplot$type))
+    levels(subplot$type) <- c("Optint w/ Cmax", "Optint", "Basic")
+    subplot$median <- as.numeric(subplot$median)
+    subplot$q025 <- as.numeric(subplot$q025)
+    subplot$q25 <- as.numeric(subplot$q25)
+    subplot$q75 <- as.numeric(subplot$q75)
+    subplot$q975 <- as.numeric(subplot$q975)
+
+    plotobj <- ggplot(subplot, aes(x = type, y = median))
+    plotobj <- plotobj + geom_linerange(aes(ymin = q025, ymax = q975), color = "red")
+    plotobj <- plotobj + geom_pointrange(aes(ymin = q25, ymax = q75))
+    plotobj <- plotobj + geom_hline(yintercept = 1, lty = 2, color = "green4")
+    plotobj <- plotobj + geom_hline(yintercept = user, color = "red", linetype = "dashed")
+    plotobj <- plotobj + ggtitle(paste("Metric:", metric))
+    plotobj <- plotobj + xlab("\nMethod")
+    plotobj <- plotobj + scale_y_continuous("Method/Reference Ratio\n")
+    if (zoom) {
+      lim.check <- c(boxplot.stats(subplot$prop)$stats[c(1, 5)], user)
+      ylim.box <- c(min(lim.check), max(lim.check))
+      plotobj <- plotobj + coord_cartesian(ylim = ylim.box)
+    }
+    plotobj <- plotobj + coord_flip()
+    if (is.null(layout)) print(plotobj)
+    else print(plotobj, vp = layout)
+  }
+
+# -----------------------------------------------------------------------------
+
+  box.plot.fn("auc", user.auc, F, T)
+  box.plot.fn("cmax", user.cmax, F, T)
+  box.plot.fn("tmax", user.tmax, F, T)
+
+  forest.plot.fn("auc", user.auc, F)
+  forest.plot.fn("cmax", user.cmax, F)
+  forest.plot.fn("tmax", user.tmax, F)
