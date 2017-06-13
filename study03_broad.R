@@ -41,7 +41,7 @@
   study.fn <- function(data, par, fn, nobs, t2, sdev = 0.05, tlast = 24, logauc = F) {
     niter <- dim(data)[2]
     absorp <- ifelse((dim(par)[1] %% 2) != 0, T, F)
-    t1 <- seq(0, tlast, length.out = nobs+1)
+    t1 <- seq(0, tlast, length.out = nobs)
     err <- matrix(
       1 + rnorm(n = length(t1)*niter, mean = 0, sd = sdev),
       nrow = length(t1), ncol = niter
@@ -104,7 +104,7 @@
       data = data.names[i],
       result = study.fn(get(data.names[i]),
         par = get(par.names[i]), fn = get(fn.names[i]),
-        t2 = get(t2.names[i]), nobs = 8
+        t2 = get(t2.names[i]), nobs = 9
       )
     )
   }

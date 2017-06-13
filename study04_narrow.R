@@ -35,7 +35,7 @@
   time.samp <- seq(0, 24, by = 0.05)
   sdev <- 0.05
   tlast <- 24
-  nobs <- 8
+  nobs <- 9
   t1 <- c(0, 0.5, 1, 2, 3, 4, 5, 6, 8, 12, 16, 24)
 
   pred.d1a <- function(x, p) {
@@ -43,7 +43,7 @@
   }
   d1a.p <- c(-0.2, -0.4, 4)
   d1a <- pred.d1a(time.samp, d1a.p)
-  times <- seq(0, tlast, length.out = nobs+1)
+  times <- seq(0, tlast, length.out = nobs)
   err <- matrix(
     1 + rnorm(n = length(times)*niter, mean = 0, sd = sdev),
     nrow = length(times), ncol = niter
