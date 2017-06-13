@@ -49,7 +49,8 @@
     opt.gra <- list(NULL)
     opt.con <- list(NULL)
     opt.mes <- list(NULL)
-    lmres <- unname(lm(log(y) ~ x)$coefficients)
+    lm.sub <- which(y == max(y))[1]:length(y)
+    lmres <- unname(lm(log(y[lm.sub]) ~ x[lm.sub])$coefficients)
     for (i in 1:nexp) {
       if (i == 1 & !oral) {
         optres <- list(
