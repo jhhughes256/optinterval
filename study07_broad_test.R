@@ -128,13 +128,12 @@
           counts = NULL, convergence = 0, message = NULL
         )
       } else {
-        browser()
         k <- 1
-        all.best <- c(NULL)
+        all.best <<- c(NULL)
         repeat {
-          j <- 1
-          best <- Inf
-          repeat {
+          # j <- 1
+          # best <- Inf
+          # repeat {
             gares <- ga("real-valued",
               mle.sumexp, x = x, y = y, ga = T, sigma = 0.01,
               min = c(rep(lmres[2]*50, i + oral), rep(lmres[1]-2, i)),
@@ -144,6 +143,7 @@
               mutation = gareal_raMutation,
               maxiter = run.desc[1],
               popSize = run.desc[2],
+              pmutation = 0.4,
               monitor = F
             )
             optres <- optim(
@@ -152,19 +152,20 @@
               method = "BFGS",
               x = x, y = y, sigma = 0.01
             )
-            if (optres$value < best) {
-              best <- optres$value
-              j <- 1
-            } else {
-              j <- j + 1
-              if (j == run.desc[3]) break
-            }
-          }
-          all.best <- c(all.best, best)
-          if (k == 1000) break
+            # if (optres$value < best) {
+            #   best <- optres$value
+            #   j <- 1
+            # } else {
+            #   j <- j + 1
+            #   if (j == 7) break
+            # }
+          # }
+          # all.best <<- c(all.best, best)
+          all.best <<- c(all.best, optres$value)
+          if (k == 10000) break
           k <- k + 1
         }
-
+        browser()
       }
       opt.par[[i]] <- optres$par
       opt.val[[i]] <- optres$value
