@@ -27,7 +27,8 @@
   #theme_update(plot.title = element_text(hjust = 0.5))
 
 # Source scripts to set up environment
-  niter <- 20
+  niter <- 100
+  # set.seed(123)
   source(paste(git.dir, reponame, "study_functions.R", sep = "/"))
   source(paste(git.dir, reponame, "study_rdata.R", sep = "/"))
 
@@ -96,10 +97,12 @@
       )
     )
     return(list(auc = auc, cmax = cmax, tmax = tmax))
+    # return(list(par = par, fit.par = fit.par, t2 = t2, t3 = t3, auc = auc, cmax = cmax, tmax = tmax))
   }
 
   fin.res <- list(NULL)
   for (i in 1:5) {
+  # for (i in 3) {
     fin.res[[i]] <- list(
       data = data.names[i],
       result = study.fn(get(data.names[i]),
