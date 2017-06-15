@@ -81,13 +81,14 @@
     levels(subplot$type) <- c("Basic", "Optint", "Optint w/ Cmax")
 
     plotobj <- ggplot(subplot, aes(x = type, y = prop))
-    plotobj <- plotobj + geom_hline(yintercept = 1, color = "green4", linetype = "dashed")
+    plotobj <- plotobj + geom_hline(yintercept = c(0.8, 1.25), color = "green4", linetype = "dashed")
     plotobj <- plotobj + geom_boxplot()
     plotobj <- plotobj + ggtitle(paste("Data:", data, "- Metric:", metric))
     plotobj <- plotobj + xlab("\nMethod")
     plotobj <- plotobj + ylab("Method/Reference Ratio\n")
     if (zoom) {
       ylim.box <- boxplot.stats(subplot$prop)$stats[c(1, 5)]
+      # ylim.box <- c(0.6, 1.7) # "broad_boxplot_auc_zoom.png"
       plotobj <- plotobj + coord_cartesian(ylim = ylim.box)
     }
     if (x) plotobj <- plotobj + stat_summary(fun.y = mean, geom = "point", shape = 4, size = 4)
@@ -119,6 +120,44 @@
 
 # -----------------------------------------------------------------------------
 
+  # png("broad_boxplot_auc_zoom.png", width = 1200, height = 480)
+  # png("broad_boxplot_auc_nozoom.png", width = 1200, height = 480)
+  vplayout <- function(x, y) viewport(layout.pos.row = x, layout.pos.col = y)
+  grid.newpage()
+  pushViewport(viewport(layout = grid.layout(1,5)))
+
+  box.plot.fn("auc", "d1a", F, T, vplayout(1,1))
+  box.plot.fn("auc", "d2a", F, T, vplayout(1,2))
+  box.plot.fn("auc", "d3a", F, T, vplayout(1,3))
+  box.plot.fn("auc", "d2b", F, T, vplayout(1,4))
+  box.plot.fn("auc", "d3b", F, T, vplayout(1,5))
+
+  dev.off()
+
+  # png("broad_boxplot_cmax_nozoom.png", width = 720, height = 480)
+  vplayout <- function(x, y) viewport(layout.pos.row = x, layout.pos.col = y)
+  grid.newpage()
+  pushViewport(viewport(layout = grid.layout(1,3)))
+
+  box.plot.fn("cmax", "d1a", F, F, vplayout(1,1))
+  box.plot.fn("cmax", "d2a", F, F, vplayout(1,2))
+  box.plot.fn("cmax", "d3a", F, F, vplayout(1,3))
+
+  dev.off()
+
+  # png("broad_boxplot_tmax_nozoom.png", width = 720, height = 480)
+  vplayout <- function(x, y) viewport(layout.pos.row = x, layout.pos.col = y)
+  grid.newpage()
+  pushViewport(viewport(layout = grid.layout(1,3)))
+
+  box.plot.fn("tmax", "d1a", F, F, vplayout(1,1))
+  box.plot.fn("tmax", "d2a", F, F, vplayout(1,2))
+  box.plot.fn("tmax", "d3a", F, F, vplayout(1,3))
+
+  dev.off()
+
+# -----------------------------------------------------------------------------
+
   vplayout <- function(x, y) viewport(layout.pos.row = x, layout.pos.col = y)
   grid.newpage()
   pushViewport(viewport(layout = grid.layout(1,3)))
@@ -145,9 +184,9 @@
   grid.newpage()
   pushViewport(viewport(layout = grid.layout(1,3)))
 
-  box.plot.fn("auc", "d2a", F, T, vplayout(1,1))
-  box.plot.fn("cmax", "d2a", F, T, vplayout(1,2))
-  box.plot.fn("tmax", "d2a", F, T, vplayout(1,3))
+  box.plot.fn("auc", "d2a", F, F, vplayout(1,1))
+  box.plot.fn("cmax", "d2a", F, F, vplayout(1,2))
+  box.plot.fn("tmax", "d2a", F, F, vplayout(1,3))
 
   dev.off()
 

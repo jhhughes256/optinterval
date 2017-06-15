@@ -103,7 +103,7 @@
     plotobj <- ggplot(subplot, aes(x = type, y = median))
     plotobj <- plotobj + geom_linerange(aes(ymin = q025, ymax = q975), color = "red")
     plotobj <- plotobj + geom_pointrange(aes(ymin = q25, ymax = q75))
-    plotobj <- plotobj + geom_hline(yintercept = 1, lty = 2, color = "green4")
+    plotobj <- plotobj + geom_hline(yintercept = c(0.8, 1.25), lty = 2, color = "green4")
     plotobj <- plotobj + geom_hline(yintercept = user, color = "red", linetype = "dashed")
     plotobj <- plotobj + ggtitle(paste("Metric:", metric))
     plotobj <- plotobj + xlab("\nMethod")
@@ -120,10 +120,13 @@
 
 # -----------------------------------------------------------------------------
 
-  box.plot.fn("auc", user.auc, F, T)
+  box.plot.fn("auc", user.auc, F, F)
   box.plot.fn("cmax", user.cmax, F, T)
   box.plot.fn("tmax", user.tmax, F, T)
 
   forest.plot.fn("auc", user.auc, F)
+  # ggsave("narrow_forest_auc.png")
   forest.plot.fn("cmax", user.cmax, F)
+  # ggsave("narrow_forest_cmax.png")
   forest.plot.fn("tmax", user.tmax, F)
+  # ggsave("narrow_forest_tmax.png")
