@@ -12,25 +12,29 @@
     l <- length(x)
     a <- ifelse(l %% 2 == 0, 0, 1)
     n <- ceiling(l/2)
+    m <- x[1:n]  # new
+    ord <- order(m, decreasing = T)  # new
+    p <- c(m[ord], x[(n+1):l])  # new
     for (i in 1:n) {
-      if (i == 1) y <- x[i]^d*exp(x[i]*t + x[n+i])
-      else if (i != n | a == 0) y <- y + x[i]^d*exp(x[i]*t + x[n+i])
-      else if (a == 1) y <- y - x[i]^d*exp(x[i]*t)*sum(exp(x[(n+1):(2*n-1)]))
+      if (i == 1) y <- p[i]^d*exp(p[i]*t + p[n+i])
+      else if (i != n | a == 0) y <- y + p[i]^d*exp(p[i]*t + p[n+i])
+      else if (a == 1) y <- y - p[i]^d*exp(p[i]*t)*sum(exp(p[(n+1):(2*n-1)]))
     }
     return(y)
   }
 
-# Version without loops
-#  pred.sumexp <- function(p, x, d = 0) {
-#    l <- length(p)
-#    a <- ifelse(l %% 2 == 0, F, T)
-#    n <- ceiling(l/2)
-#    m <- p[1:(n-a)]
-#    b <- p[(n+1):l]
-#    y <- colSums(exp(b)*outer(m, x, function(m, x) m^d*exp(m*x))) -
-#      a*m[n]*exp(m[n]*x)*sum(exp(b))
-#    return(y)
-#  }
+# Old function
+# pred.sumexp <- function(x, t, d = 0) {
+#   l <- length(x)
+#   a <- ifelse(l %% 2 == 0, 0, 1)
+#   n <- ceiling(l/2)
+#   for (i in 1:n) {
+#     if (i == 1) y <- x[i]^d*exp(x[i]*t + x[n+i])
+#     else if (i != n | a == 0) y <- y + x[i]^d*exp(x[i]*t + x[n+i])
+#     else if (a == 1) y <- y - x[i]^d*exp(x[i]*t)*sum(exp(x[(n+1):(2*n-1)]))
+#   }
+#   return(y)
+# }
 
 # Maximum likelihood estimation function for parameter optimisation
   mle.sumexp <- function(par, x, y, sigma, ga = F) {
@@ -77,14 +81,16 @@
           x = x, y = y, sigma = 0.01
         )
       }
-      opt.par[[i]] <- optres$par
+      slope.par <- optres$par[1:(i+oral)]
+      slope.ord <- order(slope.par, decreasing = T)
+      par.ord <- unname(c(slope.par[slope.ord], optres$par[(i+oral+1):length(optres$par)]))
+      opt.par[[i]] <- par.ord
       opt.val[[i]] <- optres$value
       opt.gra[[i]] <- optres$counts
       opt.con[[i]] <- optres$convergence
       opt.mes[[i]] <- ifelse(is.null(optres$message),
         "NULL", optres$message)
     }
-
     res <- list(par = opt.par, value = opt.val, counts = opt.gra,
       convergence = opt.con, message = opt.mes)
     res
