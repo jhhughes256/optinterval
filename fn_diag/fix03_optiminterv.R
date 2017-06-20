@@ -230,11 +230,13 @@
   table(res.con.log)
 
 # -----------------------------------------------------------------------------
+# All this testing is useless, function returns the last result, not the best!
+# See fix04... for proper analysis
   optim.interv.new(p, 15)
   res.val <- c(NULL)
   res.con <- c(NULL)
   for (i in 1:1000) {
-    opt <- optim.interv.new(p, 15)
+    opt <- optim.interv.new(p, 3)
     res.val[i] <- opt$value
     res.con[i] <- opt$convergence
   }
@@ -250,12 +252,14 @@
   # - 10
   # 05perct   10perct   25perct   50perct   75perct   90perct   95perct
   # 6.775586  6.775586  6.775586  6.775586  6.775586 38.320782 41.970952
-  # - 15
+  # - 15  # note: only 722 loops
+  # 05perct   10perct   25perct   50perct   75perct   90perct   95perct
+  # 2.931696  6.775586  6.775586  6.775586  6.775586 38.353301 41.510440
 
   res.val <- c(NULL)
   res.con <- c(NULL)
   for (i in 1:1000) {
-    opt <- optim.interv.new(p, 15, tmax = 1)
+    opt <- optim.interv.new(p, 3, tmax = 1)
     res.val[i] <- opt$value
     res.con[i] <- opt$convergence
   }
@@ -271,4 +275,6 @@
   # - 10
   # 05perct    10perct    25perct    50perct    75perct    90perct    95perct
   # 2.164885  98.830761 100.839855 100.839935 100.840272 100.844184 101.481981
-  # - 15
+  # - 15  # note: only 838 loops
+  # 05perct    10perct    25perct    50perct    75perct    90perct    95perct
+  # 1.462877   6.795721 100.839844 100.839927 100.840197 100.842331 101.479591
