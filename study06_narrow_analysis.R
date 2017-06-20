@@ -53,11 +53,10 @@
     d.in <- d1a[[slot.names[i]]]
     d.melt <- data.frame(
       metric = slot.names[i],
-      ref = rep(d.in$true, 3),
-      test = c(d.in$basic,
-        d.in$optint,
+      ref = rep(d.in$true, 2),
+      test = c(d.in$optint,
         d.in$optintwCmax),
-      type = c(rep("bas", 1000), rep("opt", 1000), rep("optc", 1000)))
+      type = c(rep("opt", 1000), rep("optc", 1000)))
     d.melt$prop <- with(d.melt, test/ref)
     res <- rbind(res, ddply(d.melt, .(type), function(x) {
       c(metric = slot.names[i], sumfuncBOX(x$prop))
@@ -69,7 +68,7 @@
   box.plot.fn <- function(metric, user, x, zoom, layout = NULL) {
     subplot <- plotdata[plotdata$metric == metric & plotdata$type != "bas", ]
     subplot$type <- as.factor(subplot$type)
-    levels(subplot$type) <- c("Basic", "Optint", "Optint w/ Cmax")
+    levels(subplot$type) <- c("Optint", "Optint w/ Cmax")
 
     plotobj <- ggplot(subplot, aes(x = type, y = prop))
     plotobj <- plotobj + geom_boxplot()
@@ -93,7 +92,7 @@
   forest.plot.fn <- function(metric, user, zoom, layout = NULL) {
     subplot <- res[res$metric == metric & res$type != "bas", ]
     subplot$type <- factor(subplot$type, levels = rev(subplot$type))
-    levels(subplot$type) <- c("Optint w/ Cmax", "Optint", "Basic")
+    levels(subplot$type) <- c("Optint w/ Cmax", "Optint")
     subplot$median <- as.numeric(subplot$median)
     subplot$q025 <- as.numeric(subplot$q025)
     subplot$q25 <- as.numeric(subplot$q25)

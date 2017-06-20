@@ -27,7 +27,7 @@
   #theme_update(plot.title = element_text(hjust = 0.5))
 
 # Source scripts to set up environment
-  source(paste(git.dir, reponame, "study_functions.R", sep = "/"))
+  source(paste(git.dir, reponame, "fn_diag/fix_functions.R", sep = "/"))
 
 # -----------------------------------------------------------------------------
 # Set basic parameters

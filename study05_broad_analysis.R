@@ -87,8 +87,8 @@
     plotobj <- plotobj + xlab("\nMethod")
     plotobj <- plotobj + ylab("Method/Reference Ratio\n")
     if (zoom) {
-      ylim.box <- boxplot.stats(subplot$prop)$stats[c(1, 5)]
-      # ylim.box <- c(0.6, 1.7) # "broad_boxplot_auc_zoom.png"
+      # ylim.box <- boxplot.stats(subplot$prop)$stats[c(1, 5)]
+      ylim.box <- c(0.6, 1.7) # "broad_boxplot_auc_zoom.png"
       plotobj <- plotobj + coord_cartesian(ylim = ylim.box)
     }
     if (x) plotobj <- plotobj + stat_summary(fun.y = mean, geom = "point", shape = 4, size = 4)

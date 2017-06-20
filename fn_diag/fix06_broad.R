@@ -96,8 +96,8 @@
         FUN = function(x, y, z) z[which(pred.sumexp(x, z) == y)][1]
       )
     )
-    return(list(auc = auc, cmax = cmax, tmax = tmax))
-    # return(list(par = par, fit.par = fit.par, t2 = t2, t3 = t3, auc = auc, cmax = cmax, tmax = tmax))
+    # return(list(auc = auc, cmax = cmax, tmax = tmax))
+    return(list(par = par, fit.par = fit.par, t2 = t2, t3 = t3, auc = auc, cmax = cmax, tmax = tmax))
   }
 
   fin.res <- list(NULL)

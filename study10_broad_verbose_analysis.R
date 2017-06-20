@@ -108,6 +108,7 @@
         lower <- q25 - (q75 - q25)
         upper <- q75 + (q75 - q25)
         x$outlier <- ifelse(x$prop < lower | x$prop > upper, T, F)
+        x$bioq <- ifelse(x$prop < 0.8 | x$prop > 1.25, F, T)
         x
       })
       d.out <- rbind(d.out, d.mid)
@@ -117,7 +118,7 @@
   }
 # -----------------------------------------------------------------------------
 # Now to determine if the outliers are different in some way!
-  d.outlier <- plotdata[plotdata$outlier, ]
+  d.outlier <- plotdata[plotdata$outlier & !plotdata$bioq, ]
   time.samp <- seq(0, 24, by = 0.1)
   plot.rdata <- function(ref, test, t, n, interv, log = F) {
     plotdata <- data.frame(
