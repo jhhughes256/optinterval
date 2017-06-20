@@ -73,7 +73,7 @@
           crossover = gareal_spCrossover,
           mutation = gareal_raMutation,
           maxiter = 50,
-          popSize = 250,
+          popSize = 1250,
           monitor = F
         )
         optres <- optim(
@@ -199,33 +199,6 @@
         }
       }
       if (j == jmax) break
-    }
-    return(best.res)
-  }
-
-  optim.interv.div <- function(fit.par, tlast, nobs, div = c(0.25, 0.5, 1, 2, 4), tmax = F) {
-    absorp <- ifelse((length(fit.par) %% 2) != 0, T, F)
-    best.res <- list(NULL)
-    tmax.val <- tmax.sumexp(fit.par, tlast = tlast)
-    if (tmax) tmax.opt <- tmax.val
-    else tmax.opt <- NULL
-    for (i in 1:length(div)) {
-      x <- exp(seq(log(div[i]*tmax.val), log(tlast), length.out = nobs - 1))
-      init.par <- x[-length(x)]
-      if (tmax) init.par <- init.par[-length(init.par)]
-      res <- optim(
-        init.par,
-        err.interv,
-        method = "L-BFGS-B", control = c(maxit = 500),
-        lower = min(x), upper = max(x),
-        exp.par = fit.par, tfirst = min(x) + 0.01, tlast = max(x) - 0.01, tmax = tmax.opt,
-        a = absorp
-      )
-      browser()
-      if (res$convergence == 0) {
-        if (is.null(best.res[[1]])) best.res <- res
-        else if ((res$value + 0.1) < best.res$value) best.res <- res
-      }
     }
     return(best.res)
   }

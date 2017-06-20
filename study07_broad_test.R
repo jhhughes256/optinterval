@@ -102,13 +102,14 @@
 
 # -----------------------------------------------------------------------------
 
-  run.desc <- c(50, 250, 2)
+  #run.desc <- c(50, 250, 2)
   #run.desc <- c(100, 250, 2)
   #run.desc <- c(50, 500, 2)
   #run.desc <- c(50, 250, 5)
   #run.desc <- c(50, 250, 6)
   #run.desc <- c(50, 250, 7)
   #run.desc <- c(50, 250, 8)
+  run.desc <- c(50, 1250, 1)
 
   optim.sumexp <- function(data, oral = F, nexp = 3) {
     x <- data[which(data[, 2] > 0 & data[, 1] != 0), 1]
@@ -143,7 +144,6 @@
               mutation = gareal_raMutation,
               maxiter = run.desc[1],
               popSize = run.desc[2],
-              pmutation = 0.4,
               monitor = F
             )
             optres <- optim(
@@ -162,7 +162,7 @@
           # }
           # all.best <<- c(all.best, best)
           all.best <<- c(all.best, optres$value)
-          if (k == 10000) break
+          if (k == 1000) break
           k <- k + 1
         }
         browser()

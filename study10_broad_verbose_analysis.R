@@ -42,9 +42,16 @@
 
   res <- data.frame(NULL)
   plotdata <- data.frame(NULL)
-  for (i in 1) {
+  for (i in 1:length(data.names)) {
     r.out <- data.frame(NULL)
     d.out <- data.frame(NULL)
+    ref.par.nexp <- ceiling(dim(get(data.names[i])[["par"]])[1]/2)
+    ref.par.m <- apply(get(data.names[i])[["par"]], 2, function(x) {
+      x[1:ceiling(length(x)/2)]
+    })
+    ref.par.c <- apply(get(data.names[i])[["par"]], 2, function(x) {
+      x[-(1:ceiling(length(x)/2))]
+    })
     fit.par.nexp <- unlist(lapply(get(data.names[i])[["fit.par"]], function(x) {
       ceiling(length(x)/2)
     }))
@@ -65,9 +72,37 @@
           d.in$optint,
           d.in$optintwCmax),
         type = c(rep("bas", 100), rep("opt", 100), rep("optc", 100)),
-        ref.m1 = get(data.names[i])[["par"]][1,],
-        ref.m2 = get(data.names[i])[["par"]][2,],
-        ref.c = get(data.names[i])[["par"]][3,],
+        ref.m1 = ref.par.m[1,],
+        ref.m2 = ref.par.m[2,],
+        ref.m3 = if (dim(ref.par.m)[1] > 2) {
+            ref.par.m[3,]
+          } else {
+            NA
+          },
+        ref.m4 = if (dim(ref.par.m)[1] > 3) {
+            ref.par.m[4,]
+          } else {
+            NA
+          },
+        ref.c1 = if (is.vector(ref.par.c)) {
+            ref.par.c
+          } else {
+            ref.par.c[1,]
+          },
+        ref.c2 = if (is.vector(ref.par.c)) {
+            NA
+          } else if (dim(ref.par.c)[1] > 1) {
+            ref.par.c[2,]
+          } else {
+            NA
+          },
+        ref.c3 = if (is.vector(ref.par.c)) {
+            NA
+          } else if (dim(ref.par.c)[1] > 2) {
+            ref.par.c[3,]
+          } else {
+            NA
+          },
         test.nexp = fit.par.nexp,
         test.m1 = unlist(lapply(fit.par.m, function(x) x[1])),
         test.m2 = unlist(lapply(fit.par.m, function(x) x[2])),
