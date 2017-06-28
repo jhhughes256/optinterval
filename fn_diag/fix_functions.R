@@ -55,8 +55,7 @@
     opt.mes <- list(NULL)
     lm.sub <- which(y == max(y))[1]:length(y)
     lmres <- unname(lm(log(y[lm.sub]) ~ x[lm.sub])$coefficients)
-    if (lmres[2] > 0) lmres[2] <- -lmres[2]  # NOT FOR REAL FUNCTION
-    # if (lmres[2] > 0) stop("Data Error: No terminal phase found")
+    lmres[2] <- -abs(lmres[2])  # NOT FOR REAL FUNCTION
     for (i in 1:nexp) {
       if (i == 1 & !oral) {
         optres <- list(
