@@ -7,13 +7,13 @@
       "C:/Users/hugjh001/Desktop", "C:/windows/system32")
 
     graphics.off()
-    if (getwd() == wd[1]) {
-      gir.dir <- paste0(getwd(), "/GitRepos")
+    if (getwd() %in% wd[1]) {
+      git.dir <- paste0(getwd(), "/GitRepos")
       reponame <- "optinterval"
-    } else if (getwd() == wd[2]) {
+    } else if (getwd() %in% wd[2]) {
       git.dir <- getwd()
       reponame <- "optinterval"
-    } else if (getwd() == wd[3] | getwd() == wd[4]) {
+    } else if (getwd() %in% wd[3] | getwd() == wd[4]) {
       git.dir <- "E:/Hughes/Git"
       reponame <- "splines"
     }
@@ -33,12 +33,24 @@
   source(paste(git.dir, reponame, "sumstat_functions.R", sep = "/"))
 
 # Source data
-  d1a <- readRDS(paste(git.dir, reponame, "d1a-broad-verbose.rds", sep = "/"))
+
+  # d1a <- readRDS(paste(git.dir, reponame, "fn_diag/d1a-broad-verbose.rds", sep = "/"))
+  # d2a <- readRDS(paste(git.dir, reponame, "fn_diag/d2a-broad-verbose.rds", sep = "/"))
+  # d3a <- readRDS(paste(git.dir, reponame, "fn_diag/d3a-broad-verbose.rds", sep = "/"))
+  # d2b <- readRDS(paste(git.dir, reponame, "fn_diag/d2b-broad-verbose.rds", sep = "/"))
+  # d3b <- readRDS(paste(git.dir, reponame, "fn_diag/d3b-broad-verbose.rds", sep = "/"))
+
+  d1a <- readRDS(paste(git.dir, reponame, "fn_diag/d1a-broad-popsize.rds", sep = "/"))
+  d2a <- readRDS(paste(git.dir, reponame, "fn_diag/d2a-broad-popsize.rds", sep = "/"))
+  d3a <- readRDS(paste(git.dir, reponame, "fn_diag/d3a-broad-popsize.rds", sep = "/"))
+  d2b <- readRDS(paste(git.dir, reponame, "fn_diag/d2b-broad-popsize.rds", sep = "/"))
+  d3b <- readRDS(paste(git.dir, reponame, "fn_diag/d3b-broad-popsize.rds", sep = "/"))
 
 # -----------------------------------------------------------------------------
 # Data structure
-  data.names <- c("d1a")
+  data.names <- c("d1a", "d2a", "d3a", "d2b", "d3b")
   slot.names <- c("auc", "cmax", "tmax")
+  niter <- 1000
 
   res <- data.frame(NULL)
   plotdata <- data.frame(NULL)
@@ -64,14 +76,14 @@
     for (j in 1:3) {
       d.in <- get(data.names[i])[[slot.names[j]]]
       d.melt <- data.frame(
-        id = rep(1:100, 3),
+        id = rep(1:niter, 3),
         data = data.names[i],
         metric = slot.names[j],
         ref = rep(d.in$true, 3),
         test = c(d.in$basic,
           d.in$optint,
           d.in$optintwCmax),
-        type = c(rep("bas", 100), rep("opt", 100), rep("optc", 100)),
+        type = c(rep("bas", niter), rep("opt", niter), rep("optc", niter)),
         ref.m1 = ref.par.m[1,],
         ref.m2 = ref.par.m[2,],
         ref.m3 = if (dim(ref.par.m)[1] > 2) {

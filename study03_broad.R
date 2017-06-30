@@ -8,7 +8,7 @@
 
     graphics.off()
     if (getwd() == wd[1]) {
-      gir.dir <- paste0(getwd(), "/GitRepos")
+      git.dir <- paste0(getwd(), "/GitRepos")
       reponame <- "optinterval"
     } else if (getwd() == wd[2]) {
       git.dir <- getwd()
@@ -27,8 +27,8 @@
   #theme_update(plot.title = element_text(hjust = 0.5))
 
 # Source scripts to set up environment
-  niter <- 100
-  # set.seed(123)
+  niter <- 1000
+  set.seed(123)
   source(paste(git.dir, reponame, "study_functions.R", sep = "/"))
   source(paste(git.dir, reponame, "study_rdata.R", sep = "/"))
 
