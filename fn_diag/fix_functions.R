@@ -45,7 +45,7 @@
   }
 
 # Fit sum of exponentials to curve for different numbers of exponentials
-  optim.sumexp <- function(data, oral = F, nexp = 3) {
+  optim.sumexp <- function(data, oral = F, nexp = 3, popn = 1250) {
     x <- data[which(data[, 2] > 0 & data[, 1] != 0), 1]
     y <- data[which(data[, 2] > 0 & data[, 1] != 0), 2]
     opt.par <- list(NULL)
@@ -72,7 +72,7 @@
           crossover = gareal_spCrossover,
           mutation = gareal_raMutation,
           maxiter = 50,
-          popSize = 1250,
+          popSize = popn,
           monitor = F
         )
         optres <- optim(
@@ -199,6 +199,7 @@
       }
       if (j == jmax) break
     }
+    best.res$par <- best.res$par[order(best.res$par)]
     return(best.res)
   }
 

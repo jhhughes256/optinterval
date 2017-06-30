@@ -8,7 +8,7 @@
 
     graphics.off()
     if (getwd() == wd[1]) {
-      gir.dir <- paste0(getwd(), "/GitRepos")
+      git.dir <- paste0(getwd(), "/GitRepos")
       reponame <- "optinterval"
     } else if (getwd() == wd[2]) {
       git.dir <- getwd()
