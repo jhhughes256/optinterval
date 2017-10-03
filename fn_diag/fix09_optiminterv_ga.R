@@ -117,7 +117,7 @@
     res <- optim(
       gares@solution[order(gares@solution)],
       err.interv.ga,
-      method = "BFGS",
+      method = "BFGS", hessian = T,
       exp.par = fit.par, tfirst = tfirst, tlast = tlast, tmax = tmax,
       a = absorp
     )
@@ -131,12 +131,29 @@
   xmax <- 24
   p <- c(-0.8243497, -0.8205869, -1.2830615, 3.6208785, 4.5177880)
   t1 <- c(rep(xmin, nsamp - 1), xmax)
+  res.par <- list(NULL)
   res.val <- c(NULL)
+  res.cou <- list(NULL)
   res.con <- c(NULL)
+  res.mes <- list(NULL)
+  res.hes <- list(NULL)
   for (i in 1:1000) {
     opt <- optim.interv.ga(p, t1)
+    res.par[[i]] <- opt$par
     res.val[i] <- opt$value
+    res.cou[[i]] <- opt$counts
     res.con[i] <- opt$convergence
+    res.mes[[i]] <- ifelse(is.null(opt$message), NA, opt$message)
+    res.hes[[i]] <- opt$hessian
   }
   sumfuncPercentile(res.val)
   table(res.con)
+  fail <- which(res.con == 1)
+  res.cou[fail]
+  res.val[fail]
+  res.par[fail]
+  res.hes[fail]
+  mapply(res.hes[fail], res.par[fail], FUN = function(x, y) {
+    round(sqrt(diag(solve(x)))/abs(y)*100, 2)
+  })
+  round(sqrt(diag(solve(res.hes[[1]])))/abs(res.par[[1]])*100, 2)

@@ -12,9 +12,9 @@
     l <- length(x)
     a <- ifelse(l %% 2 == 0, 0, 1)
     n <- ceiling(l/2)
-    m <- x[1:n]  # new
-    ord <- order(m, decreasing = T)  # new
-    p <- c(m[ord], x[(n+1):l])  # new
+    m <- x[1:n]
+    ord <- order(m, decreasing = T)
+    p <- c(m[ord], x[(n+1):l])
     for (i in 1:n) {
       if (i == 1) y <- p[i]^d*exp(p[i]*t + p[n+i])
       else if (i != n | a == 0) y <- y + p[i]^d*exp(p[i]*t + p[n+i])
