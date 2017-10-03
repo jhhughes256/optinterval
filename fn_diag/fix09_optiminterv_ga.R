@@ -1,0 +1,142 @@
+# Fixing optiminterv as per Issue #9
+# -----------------------------------------------------------------------------
+# Load libraries
+  library(GA)
+
+# Set up old functions
+  pred.sumexp <- function(x, t, d = 0) {
+    l <- length(x)
+    a <- ifelse(l %% 2 == 0, 0, 1)
+    n <- ceiling(l/2)
+    m <- x[1:n]  # new
+    ord <- order(m, decreasing = T)  # new
+    p <- c(m[ord], x[(n+1):l])  # new
+    for (i in 1:n) {
+      if (i == 1) y <- p[i]^d*exp(p[i]*t + p[n+i])
+      else if (i != n | a == 0) y <- y + p[i]^d*exp(p[i]*t + p[n+i])
+      else if (a == 1) y <- y - p[i]^d*exp(p[i]*t)*sum(exp(p[(n+1):(2*n-1)]))
+    }
+    return(y)
+  }
+
+# Trapezoidal error function for interval optimisation
+  err.interv <- function(par, exp.par, tfirst, tlast, tmax = NULL, a = F) {
+    times <- c(tfirst, par, tlast, tmax)
+    deltat <- diff(times)
+    if (a) {
+      all.secd <- abs(pred.sumexp(exp.par, times, 2))
+      secd <- c(NULL)
+      for (i in 1:(length(times)-1)) {
+        secd[i] <- all.secd[which(all.secd == max(all.secd[c(i, i + 1)]))][1]
+      }
+    } else {
+      secd <- pred.sumexp(exp.par, times[-length(times)], 2)
+    }
+    err <- deltat^3*secd/12
+    sum(err^2)
+  }
+
+
+# Interval optimising function
+  optim.interv <- function(times, fit.par, tmax = NULL) {
+    x <- times[order(times)]
+    init.par <- x[-c(1, length(x))]
+    if (!is.null(tmax)) init.par <- init.par[-length(init.par)]
+    xmin <- min(x)
+    xmax <- max(x)
+    absorp <- ifelse((length(fit.par) %% 2) != 0, T, F)
+    res <- optim(
+      init.par,
+      err.interv,
+      method = "L-BFGS-B", control = c(maxit = 500),
+      lower = xmin, upper = xmax,
+      exp.par = fit.par, tfirst = xmin + 0.01, tlast = xmax - 0.01, tmax = tmax,
+      a = absorp
+    )
+    return(res)
+  }
+
+  tmax.sumexp <- function(fit.par, tlast = 24, res = 0.1) {
+    times <- seq(0, tlast, by = res)
+    yhat <- pred.sumexp(fit.par, times)
+    return(times[which(yhat == max(yhat))])
+  }
+
+  sumfuncPercentile <- function(x) {
+    stat1 <-  quantile(x, probs = 0.05, na.rm = T, names = F)
+    stat2 <-  quantile(x, probs = 0.10, na.rm = T, names = F)
+    stat3 <-  quantile(x, probs = 0.25, na.rm = T, names = F)
+    stat4 <-  quantile(x, probs = 0.50, na.rm = T, names = F)
+    stat5 <-  quantile(x, probs = 0.75, na.rm = T, names = F)
+    stat6 <-  quantile(x, probs = 0.90, na.rm = T, names = F)
+    stat7 <-  quantile(x, probs = 0.95, na.rm = T, names = F)
+    result <- c("05perct" = stat1, "10perct" = stat2,
+      "25perct" = stat3, "50perct" = stat4, "75perct" = stat5,
+      "90perct" = stat6, "95perct" = stat7)
+    result
+  }
+
+# -----------------------------------------------------------------------------
+# New functions
+# Trapezoidal error function for interval optimisation
+  err.interv.ga <- function(par, exp.par, tfirst, tlast, tmax = NULL, a = F, ga = F) {
+    z <- ifelse(ga, -1, 1)
+    times <- c(tfirst, par, tlast, tmax)
+    times <- times[order(times)]
+    deltat <- diff(times)
+    if (a) {
+      all.secd <- abs(pred.sumexp(exp.par, times, 2))
+      secd <- c(NULL)
+      for (i in 1:(length(times)-1)) {
+        secd[i] <- all.secd[which(all.secd == max(all.secd[c(i, i + 1)]))][1]
+      }
+    } else {
+      secd <- pred.sumexp(exp.par, times[-length(times)], 2)
+    }
+    err <- deltat^3*secd/12
+    return(z*sum(err^2))
+  }
+
+# Interval optimising function
+  optim.interv.ga <- function(fit.par, times, tmax = NULL) {
+    tfirst <- min(times)
+    tlast <- max(times)
+    npar <- length(times)
+    absorp <- ifelse((length(fit.par) %% 2) != 0, T, F)
+    gares <- ga("real-valued",
+      err.interv.ga, exp.par = fit.par, a = absorp,
+      tfirst = tfirst, tlast = tlast, tmax = tmax, ga = T,
+      min = rep(tfirst + 0.01, npar), max = rep(tlast - 0.01, npar),
+      selection = gareal_lrSelection,
+      crossover = gareal_spCrossover,
+      mutation = gareal_raMutation,
+      maxiter = 50,
+      popSize = 250,
+      monitor = F
+    )
+    res <- optim(
+      gares@solution[order(gares@solution)],
+      err.interv.ga,
+      method = "BFGS",
+      exp.par = fit.par, tfirst = tfirst, tlast = tlast, tmax = tmax,
+      a = absorp
+    )
+    return(res)
+  }
+
+# -----------------------------------------------------------------------------
+# Reproducible example from issue #9, no tmax
+  nsamp <- 9
+  xmin <- 0
+  xmax <- 24
+  p <- c(-0.8243497, -0.8205869, -1.2830615, 3.6208785, 4.5177880)
+  t1 <- c(rep(xmin, nsamp - 1), xmax)
+  res.val <- c(NULL)
+  res.con <- c(NULL)
+  for (i in 1:1000) {
+    opt <- optim.interv.ga(p, t1)
+    res.val[i] <- opt$value
+    res.con[i] <- opt$convergence
+  }
+  sumfuncPercentile(res.val)
+  table(res.con)

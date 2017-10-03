@@ -1,0 +1,234 @@
+---
+title: "Optimization showing the confidence intervals of the fit"
+author: "Richard Upton"
+date: "Tuesday,  21 March, 2017"
+output: html_notebook
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+rm(list=ls(all=TRUE))
+```
+
+Optimization makes use of the the fact that the objective function value (OFV) varies as the parameters of the model take different values. The optimization process is of course intended to find the set of parameters that gives the lowest value for the OFV, and hence the best fit of the data. The derivatives and second derivatives of the OFV with respect to the parameters provide information about the precision of the parameter estimates.  If the OFV "surface" is flat near the OFV minimum, then the first (slope) and second (curvature) derivatives of the OFV with respect to the parameter values are near zero.  Clearly, the parameter value could take a wide range of values and still provide an acceptable fit of the data.  The parameter will be estimated with poor precision.  And vice versa is true, when the first and second derivatives are high and the parameter is estimated with good precision.  
+
+Many curve-fitting routines return this information about the OFV "surface" as a variance-covariance matrix.  More formally, they often return the "Hessian" matrix, the matrix of second derivatives of the OFV with respect to the final parameter values. The Hessian matrix has a row and column for each estimated parameter of the model, and is therefore a square matrix.  The diagonal elements provide information about the precision of the parameter estimate, while the off-diagonal elements provide the information about correlation between the parameters.  This Hessian matrix can be turned into either a variance-covariance matrix or a correlation matrix with a bit of manipulation.
+
+
+This example will look at curve-fitting a trial data set to a quadratic function to calculate and examine the diagnostic information returned by the *optim* optimization routine of R. The data will be fit using a custom defined maximum likelihood objective function.
+
+
+```{r, cache = T, echo=F, message=FALSE}
+library(Matrix)
+library(MBESS)  #for the cor2cov function
+library(MASS)  #for the mvrnorm function
+library(plyr)
+library(ggplot2)
+```
+
+
+### Generate some observed data 
+Imagine the model is a of a simple pharmacodynamic system.  We have a set of paired concentration (x) and effect (y) data.
+```{r, cache = T}
+  xobs <- c(0, 1, 2, 3, 4, 5)
+  yobs <- c(0,2.1,4.2,5.9,8,12.5)
+  
+  obsdf <- data.frame(xobs,yobs)
+  
+  plot(yobs ~ xobs)
+```  
+
+
+### A maximum likelihood optimization method 
+The "optim" function of R is a general purpose optimization method.  It needs as input an vector of initial parameter estimates, a function to minimize based on these parameters (the objective function) and the data of course.  We will write our own function to return a maximum likelihood objective function value.  This will calculate the model prediction given the current parameter values (often called yhat to distinguish it from the observed data y (yobs in our model)).
+
+```{r, cache = T}
+#Declare a vector of initial parameter values
+ par <- c(0.2,2,0.2,0.1) 
+        #Int, Slope1, Slope2, Sigma
+ 
+  
+ mle.ofv <- function(par)
+     {
+     Int    <- par[1]
+     Slope1 <- par[2]
+     Slope2 <- par[3]
+     sigma  <- par[4]  #the standard deviation of the residual error
+     #Equation to fit to data - generates yhat - the model predicted y value (this can be a function itself!)
+     yhat <-  Int + Slope1*xobs + Slope2*(xobs)^2
+     #Log densities of residual
+     res <- dnorm(yobs, yhat, sigma, log=T) 
+     #Calculate negative loglikelihood.  -2* the log likelihood is sometimes used for technical/historical reasons
+     objective <- -1*sum(res)
+     }
+```       
+
+Now use the optim function to find the best fit parameter values.  Note that we have used the option to return the Hessian matrix for the best parameter values.
+```{r, cache = T}
+  resultfit <- optim(par, mle.ofv, hessian=TRUE)
+  resultfit
+```  
+ 
+The *resultfit* object has a collection of model outputs, including the Hessian matrix.  As mentioned above, the Hessian is the second derivative matrix of the objective function value of the model with respect to the parameters.  It describes the local curvature of the objective function value for each of the parameters of the model.  High curvature = a precise parameter estimates! How does the line of best fit look?
+
+```{r, cache = T} 
+#Line of best fit - our model
+  yhat.best <- resultfit$par[1]+resultfit$par[2]*xobs+resultfit$par[3]*xobs^2
+  fitdf <- data.frame(xobs,yhat.best)
+
+   
+#Plot the results
+  plot(yobs ~ xobs)
+  points(yhat.best ~ xobs, type="l", col="blue", lty="dashed")
+
+```
+
+
+### Some regression diagnostics
+We will look at how to extract some regression diagnostics.
+
+```{r, cache = T} 
+#Calculate the residuals
+  residuals <- yobs-yhat.best
+  residuals
+```
+
+```{r, cache = T}     
+#Plot the residuals
+  plot(residuals ~ xobs)
+ 
+```
+
+The standard deviation of the residual error (sigma) can be found as follows:
+
+```{r, cache = T}
+
+  sigma <- resultfit$par[4]
+  sigma
+
+```  
+
+The overall goodness of fit (the final objective function value) is given by :
+```{r, cache = T}
+ 
+   #Our model
+   #Shafer, 2007 reports the OFV in NONMEM as:
+   #n*log(2*pi) + sum(log(sigma^2) + (residuals)^2/sigma^2), where n is the number of observations
+   #Empirically, it seems that NONMEM removes the n*log(2*pi) term, which is a constant for a given dataset
+   OFVr <- sum(log(sigma^2) + (residuals)^2/sigma^2)
+   OFVr
+
+``` 
+
+### Deriving the parameter precision from the Hessian matix.
+The first step is to invert the Hessian matrix to give the variance-covariance matrix.  The "solve" function in R is used for inverting matrices. In NONMEM, a "good" numerical approximation to the Hessian is computed at the final parameter estimates and is referred to as the R matrix.  We will use that nomenclature here.  Note that the variance-covariance matrix can be calculated by other methods in NONMEM (e.g. using the Smatrix - the Cross-Product  Gradient  matrix).  NONMEM can be forced to use the Hessian (Rmatrix) by $COV MATRIX=R.  
+```{r, cache = T}
+#Assign the R matrix to the Hessian returned by optim
+  Rmatrix <- resultfit$hessian
+```
+
+```{r, cache = T}
+##Calculate the variance-covariance matrix.  This should be similar to the *.cov output of NONMEM.
+  VCmatrix <- solve(Rmatrix)  
+  VCmatrix
+```
+
+```{r, cache = T}
+#The inverse of the VCmatrix is also known as the Fisher-Information Matrix, which should in theory match the *.coi output of NONMEM.
+  FIM <- solve(VCmatrix)
+  FIM
+```
+
+
+The VCmatrix can now be used to calculate the parameter standard errors
+```{r, cache = T}   
+#Calculate parameter standard errors
+    se.par <- sqrt(diag(VCmatrix)) 
+    se.par
+     
+#Calculate parameter standard errors as a percentage
+    sepercent.par  <- se.par/resultfit$par*100
+    sepercent.par
+
+```
+
+
+```{r, cache = T}
+#Calculate the correlation matrix
+#This should be similar to the *.cor output of NONMEM, but NONMEM reports the diagonal elements as the standard deviation of the parameter rather than 1
+   cormatrix <- cov2cor(VCmatrix) 
+   cormatrix
+```
+
+### Using the VCmatrix to generate resampled parameter estimates. 
+
+```{r, cache = T}
+# Now use multivariate rnorm to turn the covariance matrix into ETA values
+  nsim <- 10
+ 
+  set.seed(123)
+  parmat <- mvrnorm(n = nsim, mu = resultfit$par, VCmatrix)
+
+  resultfit$par
+
+  head(parmat)
+  
+```  
+
+
+Now make a function to simulate the model from the parameter values
+
+```{r, cache = T}
+
+simfunc <- function(Sim, Int, Slope1, Slope2,sigma) {
+ 
+  ysim <- Int + Slope1*xobs + Slope2*(xobs)^2
+  dfout <- data.frame(xobs,ysim)
+  dfout 
+}  
+
+```
+
+Apply the function to the resampled parameter values (matrix)
+
+```{r, cache = T}
+
+#test <- mdply(parmat,simfunc)
+#test
+
+```
+
+Apply the function to the resampled parameter values (dataframe)
+
+```{r, cache = T}
+
+pardf <- data.frame("Sim"=(1:nsim),parmat)
+names(pardf) <- c("Sim","Int","Slope1","Slope2","sigma")
+head(pardf)
+
+
+CIdata <- mdply(pardf,simfunc)
+head(CIdata)
+
+```
+
+Plotting with CI
+```{r, cache = T}
+
+# Function for calculating 5th and 95th percentiles for plotting concentrations
+	CIlow <- function(x) quantile(x, probs = 0.05)
+	CIhi <- function(x) quantile(x, probs = 0.95)
+
+	plotobj <- NULL
+	titletext <- "Fit with Confidence Intervals"
+	plotobj <- ggplot(data = CIdata)
+	plotobj <- plotobj + geom_point(aes(x=xobs,y=yobs), data=obsdf, size=3)
+	plotobj <- plotobj + geom_line(aes(x=xobs,y=yhat.best), data=fitdf, size=1, colour="blue")
+	plotobj <- plotobj + stat_summary(aes(x = xobs, y = ysim), fun.ymin = CIlow,fun.ymax = CIhi, geom = "ribbon", fill = "red", alpha = 0.3)
+	plotobj <- plotobj + stat_summary(aes(x = xobs, y = ysim), fun.y = median, geom = "line", size = 1, colour = "red")
+	plotobj <- plotobj + ggtitle(titletext)
+	plotobj
+
+
+```
+
