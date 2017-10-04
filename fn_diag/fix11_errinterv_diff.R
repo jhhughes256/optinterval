@@ -1,7 +1,9 @@
-# Trialing of ga() to determine initial parameters for optim.interv
+# What differences exist between the ga and dt strains of optim.interv
+# Also the first test of optim.interv.dt
 # -----------------------------------------------------------------------------
 # Load libraries
   library(GA)
+  library(plyr)
   library(ggplot2)
 
 # Set up old functions
@@ -20,9 +22,10 @@
     return(y)
   }
 
-# Trapezoidal error function for interval optimisation
-  err.interv <- function(par, exp.par, tfirst, tlast, tmax = NULL, a = F) {
+  err.interv.ga <- function(par, exp.par, tfirst, tlast, tmax = NULL, a = F, ga = F) {
+    z <- ifelse(ga, -1, 1)
     times <- c(tfirst, par, tlast, tmax)
+    times <- times[order(times)]
     deltat <- diff(times)
     if (a) {
       all.secd <- abs(pred.sumexp(exp.par, times, 2))
@@ -34,24 +37,31 @@
       secd <- pred.sumexp(exp.par, times[-length(times)], 2)
     }
     err <- deltat^3*secd/12
-    sum(err^2)
+    return(z*sum(err^2))
   }
 
-
 # Interval optimising function
-  optim.interv <- function(times, fit.par, tmax = NULL) {
-    x <- times[order(times)]
-    init.par <- x[-c(1, length(x))]
-    if (!is.null(tmax)) init.par <- init.par[-length(init.par)]
-    xmin <- min(x)
-    xmax <- max(x)
+  optim.interv.ga <- function(fit.par, times, tmax = NULL) {
+    tfirst <- min(times)
+    tlast <- max(times)
+    npar <- length(times) - 2
     absorp <- ifelse((length(fit.par) %% 2) != 0, T, F)
+    gares <- ga("real-valued",
+      err.interv.ga, exp.par = fit.par, a = absorp,
+      tfirst = tfirst, tlast = tlast, tmax = tmax, ga = T,
+      min = rep(tfirst + 0.01, npar), max = rep(tlast - 0.01, npar),
+      selection = gareal_lrSelection,
+      crossover = gareal_spCrossover,
+      mutation = gareal_raMutation,
+      maxiter = 50,
+      popSize = 250,
+      monitor = F
+    )
     res <- optim(
-      init.par,
-      err.interv,
-      method = "L-BFGS-B", control = c(maxit = 500),
-      lower = xmin, upper = xmax,
-      exp.par = fit.par, tfirst = xmin + 0.01, tlast = xmax - 0.01, tmax = tmax,
+      gares@solution[order(gares@solution)],
+      err.interv.ga,
+      method = "BFGS", hessian = T,
+      exp.par = fit.par, tfirst = tfirst, tlast = tlast, tmax = tmax,
       a = absorp
     )
     return(res)
@@ -80,10 +90,8 @@
 # -----------------------------------------------------------------------------
 # New functions
 # Trapezoidal error function for interval optimisation
-  err.interv.ga <- function(par, exp.par, tfirst, tlast, tmax = NULL, a = F, ga = F) {
-    z <- ifelse(ga, -1, 1)
-    times <- c(tfirst, par, tlast, tmax)
-    times <- times[order(times)]
+  err.interv.dt <- function(par, exp.par, tfirst, tlast, a = F) {
+    times <- c(tfirst, cumsum(par), tlast)
     deltat <- diff(times)
     if (a) {
       all.secd <- abs(pred.sumexp(exp.par, times, 2))
@@ -95,50 +103,43 @@
       secd <- pred.sumexp(exp.par, times[-length(times)], 2)
     }
     err <- deltat^3*secd/12
-    return(z*sum(err^2))
+    return(sum(err^2))
   }
 
 # Interval optimising function
-  optim.interv.ga <- function(fit.par, times, tmax = NULL) {
+  optim.interv.dt <- function(fit.par, times, tmax = NULL) {
     tfirst <- min(times)
     tlast <- max(times)
-    npar <- length(times)
+    npar <- length(times) - 2
     absorp <- ifelse((length(fit.par) %% 2) != 0, T, F)
-    gares <- ga("real-valued",
-      err.interv.ga, exp.par = fit.par, a = absorp,
-      tfirst = tfirst, tlast = tlast, tmax = tmax, ga = T,
-      min = rep(tfirst + 0.01, npar), max = rep(tlast - 0.01, npar),
-      selection = gareal_lrSelection,
-      crossover = gareal_spCrossover,
-      mutation = gareal_raMutation,
-      maxiter = 50,
-      popSize = 250,
-      monitor = F
-    )
+    init.par <- cumsum(rep(tlast/48, npar))
     res <- optim(
-      gares@solution[order(gares@solution)],
-      err.interv.ga,
-      method = "BFGS", hessian = T,
-      exp.par = fit.par, tfirst = tfirst, tlast = tlast, tmax = tmax,
-      a = absorp
+      init.par,
+      err.interv.dt,
+      method = "L-BFGS-B", hessian = T,
+      lower = tlast/48, upper = tlast - npar*tlast/48,
+      exp.par = fit.par, tfirst = tfirst, tlast = tlast, a = absorp
     )
     return(res)
   }
 
 # -----------------------------------------------------------------------------
-# Reproducible example from issue #9, no tmax
+# Set up example (from #9)
   nsamp <- 9
   xmin <- 0
   xmax <- 24
   p <- c(-0.8243497, -0.8205869, -1.2830615, 3.6208785, 4.5177880)
   t1 <- c(rep(xmin, nsamp - 1), xmax)
+
+# Run for err.interv using time
+  set.seed(2302)
   res.par <- list(NULL)
   res.val <- c(NULL)
   res.cou <- list(NULL)
   res.con <- c(NULL)
   res.mes <- list(NULL)
   res.hes <- list(NULL)
-  for (i in 1:100) {
+  for (i in 1:1000) {
     opt <- optim.interv.ga(p, t1)
     res.par[[i]] <- opt$par
     res.val[i] <- opt$value
@@ -149,41 +150,27 @@
   }
   sumfuncPercentile(res.val)
   table(res.con)
-  fail <- which(res.con == 1)
-  res.cou[fail]
-  res.val[fail]
-  res.par[fail]
-  res.hes[fail]
-  mapply(res.hes[fail], res.par[fail], FUN = function(x, y) {
-    round(sqrt(diag(solve(x)))/abs(y)*100, 2)
+  res.se <- mapply(res.par, res.hes, FUN = function(par, hes) {
+    vc_mat <- try(solve(hes))
+    if(class(vc_mat) != "try-error") {
+      se <- sqrt(diag(vc_mat))
+      if (!any(is.nan(se))) {
+        max_sepercent <- max(round(se/abs(par)*100))
+        if (max_sepercent < 100) {
+          "<100"
+        } else {
+          ">100"
+        }
+      } else {
+        "neg_vc_diag"
+      }
+    } else {
+      "singular"
+    }
   })
-# -----------------------------------------------------------------------------
-# Below is for meeting with RU, not applicable to every run of ga
-  times <- seq(0, 24, by = 0.1)
-  dv <- pred.sumexp(p, times)
-  data <- data.frame(time = times, dv = dv)
-  p1 <- NULL
-  p1 <- ggplot(aes(x = time, y = dv), data = data)
-  p1 <- p1 + geom_point(shape = 1)
-  # 1 is good
-  res.par[[1]]
-  round(sqrt(diag(solve(res.hes[[1]])))/abs(res.par[[1]])*100, 2)
-  p1 + geom_vline(xintercept = res.par[[1]], colour = "green4", linetype = "dashed")
-  # 4, 10 for bad
-  res.par[[4]]
-  round(sqrt(diag(solve(res.hes[[4]])))/abs(res.par[[4]])*100, 2)
-  p1 + geom_vline(xintercept = res.par[[4]], colour = "green4", linetype = "dashed")
-  res.par[[10]]
-  round(sqrt(diag(solve(res.hes[[10]])))/abs(res.par[[10]])*100, 2)
-  p1 + geom_vline(xintercept = res.par[[10]], colour = "green4", linetype = "dashed")
-  # 17 for NaN
-  res.par[[17]]
-  round(sqrt(diag(solve(res.hes[[17]])))/abs(res.par[[17]])*100, 2)
-  diag(solve(res.hes[[17]]))
-  p1 + geom_vline(xintercept = res.par[[17]], colour = "green4", linetype = "dashed")
-  # 45, 46, 70 for singular hessian
-  solve(res.hes[[45]])
-  solve(res.hes[[46]])
-  solve(res.hes[[70]])
-  solve(res.hes[[71]])
-  solve(res.hes[[87]])
+  table(res.se)
+
+# Run for err.interv using dt
+  res <- optim.interv.dt(p, t1)
+  cumsum(res$par)
+  round(sqrt(diag(solve(res$hessian)))/abs(res$par)*100, 2)
