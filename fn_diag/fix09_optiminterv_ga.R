@@ -2,6 +2,7 @@
 # -----------------------------------------------------------------------------
 # Load libraries
   library(GA)
+  library(ggplot2)
 
 # Set up old functions
   pred.sumexp <- function(x, t, d = 0) {
@@ -137,7 +138,7 @@
   res.con <- c(NULL)
   res.mes <- list(NULL)
   res.hes <- list(NULL)
-  for (i in 1:1000) {
+  for (i in 1:100) {
     opt <- optim.interv.ga(p, t1)
     res.par[[i]] <- opt$par
     res.val[i] <- opt$value
@@ -156,4 +157,33 @@
   mapply(res.hes[fail], res.par[fail], FUN = function(x, y) {
     round(sqrt(diag(solve(x)))/abs(y)*100, 2)
   })
+# -----------------------------------------------------------------------------
+# Below is for meeting with RU, not applicable to every run of ga
+  times <- seq(0, 24, by = 0.1)
+  dv <- pred.sumexp(p, times)
+  data <- data.frame(time = times, dv = dv)
+  p1 <- NULL
+  p1 <- ggplot(aes(x = time, y = dv), data = data)
+  p1 <- p1 + geom_point(shape = 1)
+  # 1 is good
+  res.par[[1]]
   round(sqrt(diag(solve(res.hes[[1]])))/abs(res.par[[1]])*100, 2)
+  p1 + geom_vline(xintercept = res.par[[1]], colour = "green4", linetype = "dashed")
+  # 4, 10 for bad
+  res.par[[4]]
+  round(sqrt(diag(solve(res.hes[[4]])))/abs(res.par[[4]])*100, 2)
+  p1 + geom_vline(xintercept = res.par[[4]], colour = "green4", linetype = "dashed")
+  res.par[[10]]
+  round(sqrt(diag(solve(res.hes[[10]])))/abs(res.par[[10]])*100, 2)
+  p1 + geom_vline(xintercept = res.par[[10]], colour = "green4", linetype = "dashed")
+  # 17 for NaN
+  res.par[[17]]
+  round(sqrt(diag(solve(res.hes[[17]])))/abs(res.par[[17]])*100, 2)
+  diag(solve(res.hes[[17]]))
+  p1 + geom_vline(xintercept = res.par[[17]], colour = "green4", linetype = "dashed")
+  # 45, 46, 70 for singular hessian
+  solve(res.hes[[45]])
+  solve(res.hes[[46]])
+  solve(res.hes[[70]])
+  solve(res.hes[[71]])
+  solve(res.hes[[87]])

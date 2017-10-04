@@ -97,7 +97,6 @@
     res
   }
 
-
 # Chi-squared difference test
   chisq.sumexp <- function(opt) {
     i <- 1
