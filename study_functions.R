@@ -45,6 +45,7 @@
   }
 
 # Fit sum of exponentials to curve for different numbers of exponentials
+  # without hessian
   optim.sumexp <- function(data, oral = F, nexp = 3) {
     x <- data[which(data[, 2] > 0 & data[, 1] != 0), 1]
     y <- data[which(data[, 2] > 0 & data[, 1] != 0), 2]
@@ -96,6 +97,60 @@
     res
   }
 
+  # with hessian matrix
+  optim.sumexp.hes <- function(data, oral = F, nexp = 3) {
+    x <- data[which(data[, 2] > 0 & data[, 1] != 0), 1]
+    y <- data[which(data[, 2] > 0 & data[, 1] != 0), 2]
+    opt.par <- list(NULL)
+    opt.val <- list(NULL)
+    opt.gra <- list(NULL)
+    opt.con <- list(NULL)
+    opt.mes <- list(NULL)
+    opt.hes <- list(NULL)
+    lm.sub <- which(y == max(y))[1]:length(y)
+    lmres <- unname(lm(log(y[lm.sub]) ~ x[lm.sub])$coefficients)
+    for (i in 1:nexp) {
+      if (i == 1 & !oral) {
+        optres <- list(
+          par = c(lmres[2], lmres[1]),
+          value = mle.sumexp(unname(c(lmres[2], lmres[1])), x, y, 0.01),
+          counts = NULL, convergence = 0, message = NULL
+        )
+      } else {
+        gares <- ga("real-valued",
+          mle.sumexp, x = x, y = y, ga = T, sigma = 0.01,
+          min = c(rep(lmres[2]*50, i + oral), rep(lmres[1]-2, i)),
+          max = c(rep(lmres[2]/50, i + oral), rep(lmres[1]+2, i)),
+          selection = gareal_lrSelection,
+          crossover = gareal_spCrossover,
+          mutation = gareal_raMutation,
+          maxiter = 50,
+          popSize = 250,
+          monitor = F
+        )
+        optres <- optim(
+          gares@solution[1, ],
+          mle.sumexp,
+          method = "BFGS", hessian = T,
+          x = x, y = y, sigma = 0.01
+        )
+      }
+      slope.par <- optres$par[1:(i+oral)]
+      slope.ord <- order(slope.par, decreasing = T)
+      par.ord <- unname(c(slope.par[slope.ord], optres$par[(i+oral+1):length(optres$par)]))
+      opt.par[[i]] <- par.ord
+      opt.val[[i]] <- optres$value
+      opt.gra[[i]] <- optres$counts
+      opt.con[[i]] <- optres$convergence
+      opt.mes[[i]] <- ifelse(is.null(optres$message),
+        "NULL", optres$message)
+      opt.hes[[i]] <- optres$hessian
+    }
+    res <- list(par = opt.par, value = opt.val, counts = opt.gra,
+      convergence = opt.con, message = opt.mes, hessian = opt.hes)
+    res
+  }
+
 # Chi-squared difference test
 # Takes a list of optim results and gives the best optim result
   chisq.sumexp <- function(opt) {
@@ -112,6 +167,7 @@
   }
 
 # Trapezoidal error function for interval optimisation
+  # standard using times
   err.interv <- function(par, exp.par, tfirst, tlast, tmax = NULL, a = F) {
     times <- c(tfirst, par, tlast, tmax)
     deltat <- diff(times)
@@ -128,7 +184,44 @@
     sum(err^2)
   }
 
+  # ga using times
+  err.interv.ga <- function(par, exp.par, tfirst, tlast, tmax = NULL, a = F, ga = F) {
+    z <- ifelse(ga, -1, 1)
+    times <- c(tfirst, par, tlast, tmax)
+    times <- times[order(times)]
+    deltat <- diff(times)
+    if (a) {
+      all.secd <- abs(pred.sumexp(exp.par, times, 2))
+      secd <- c(NULL)
+      for (i in 1:(length(times)-1)) {
+        secd[i] <- all.secd[which(all.secd == max(all.secd[c(i, i + 1)]))][1]
+      }
+    } else {
+      secd <- pred.sumexp(exp.par, times[-length(times)], 2)
+    }
+    err <- deltat^3*secd/12
+    return(z*sum(err^2))
+  }
+
+  # standard using dt
+  err.interv.dt <- function(par, exp.par, tfirst, tlast, a = F) {
+    times <- c(tfirst, cumsum(par), tlast)
+    deltat <- diff(times)
+    if (a) {
+      all.secd <- abs(pred.sumexp(exp.par, times, 2))
+      secd <- c(NULL)
+      for (i in 1:(length(times)-1)) {
+        secd[i] <- all.secd[which(all.secd == max(all.secd[c(i, i + 1)]))][1]
+      }
+    } else {
+      secd <- pred.sumexp(exp.par, times[-length(times)], 2)
+    }
+    err <- deltat^3*secd/12
+    return(sum(err^2))
+  }
+
 # Interval optimising function
+  # standard using times
   optim.interv <- function(times, fit.par, tmax = NULL) {
     x <- times[order(times)]
     init.par <- x[-c(1, length(x))]
@@ -144,6 +237,68 @@
       exp.par = fit.par, tfirst = xmin + 0.01, tlast = xmax - 0.01, tmax = tmax,
       a = absorp
     )
+    return(res)
+  }
+
+  # using dt instead of times
+  optim.interv.dt <- function(fit.par, times, tmax = NULL) {
+    tfirst <- min(times)
+    tlast <- max(times)
+    npar <- length(times) - 2
+    absorp <- ifelse((length(fit.par) %% 2) != 0, T, F)
+    init.par <- cumsum(rep(tlast/48, npar))
+    res <- optim(
+      init.par,
+      err.interv.dt,
+      method = "L-BFGS-B", hessian = T,
+      lower = tlast/48, upper = tlast - npar*tlast/48,
+      exp.par = fit.par, tfirst = tfirst, tlast = tlast, a = absorp
+    )
+    browser()
+    res$times <- cumsum(res$par)
+    return(res)
+  }
+
+  # using ga for initial parameters
+  optim.interv.ga <- function(fit.par, times, tmax = NULL) {
+    tfirst <- min(times)
+    tlast <- max(times)
+    is.tmax <- ifelse(is.null(tmax), 2, 3)
+    npar <- length(times) - is.tmax
+    absorp <- ifelse((length(fit.par) %% 2) != 0, T, F)
+    flag <- 1
+    repeat {
+      gares <- ga("real-valued",
+        err.interv.ga, exp.par = fit.par, a = absorp,
+        tfirst = tfirst, tlast = tlast, tmax = tmax, ga = T,
+        min = rep(tfirst + 0.01, npar), max = rep(tlast - 0.01, npar),
+        selection = gareal_lrSelection,
+        crossover = gareal_spCrossover,
+        mutation = gareal_raMutation,
+        maxiter = 50,
+        popSize = 250,
+        monitor = F
+      )
+      res <- optim(
+        gares@solution[order(gares@solution)],
+        err.interv.ga,
+        method = "BFGS", hessian = T,
+        exp.par = fit.par, tfirst = tfirst, tlast = tlast, tmax = tmax,
+        a = absorp
+      )
+      vc_mat <- try(solve(res$hessian))
+      if(class(vc_mat) != "try-error") {
+        se <- sqrt(diag(vc_mat))
+        if (!any(is.nan(se))) {
+          se_percent <- se/res$par*100
+          if (max(se_percent) <= 50) {
+            res$flag <- flag
+            break
+          }
+        }
+      }
+      flag <- flag + 1
+    }
     return(res)
   }
 

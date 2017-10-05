@@ -67,7 +67,8 @@
   optim.interv.ga <- function(fit.par, times, tmax = NULL) {
     tfirst <- min(times)
     tlast <- max(times)
-    npar <- length(times) - 2
+    is.tmax <- ifelse(is.null(tmax), 2, 3)
+    npar <- length(times) - is.tmax
     absorp <- ifelse((length(fit.par) %% 2) != 0, T, F)
     flag <- 1
     repeat {
