@@ -46,6 +46,7 @@
       conc = with(data, conc[time %in% t1])*e1
     )
     fit.par <- chisq.sumexp(optim.sumexp(subd, oral = absorp))$par
+    browser()
     int.t3 <- optim.interv(t1, fit.par)
     t3 <- c(0, round(int.t3$par, 1), tlast)
 

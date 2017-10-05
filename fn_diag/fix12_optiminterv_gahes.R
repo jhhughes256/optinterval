@@ -93,8 +93,11 @@
       if(class(vc_mat) != "try-error") {
         se <- sqrt(diag(vc_mat))
         if (!any(is.nan(se))) {
-          res$flag <- flag
-          break
+          se_percent <- se/res$par*100
+          if (max(se_percent) <= 50) {
+            res$flag <- flag
+            break
+          }
         }
       }
       flag <- flag + 1
@@ -131,6 +134,9 @@
   }
   sumfuncPercentile(res.val)
   table(res.con)
+  res.se <- mapply(res.par, res.hes, FUN = function(par, hes) {
+    max(round(sqrt(diag(solve(hes)))/abs(par)*100))
+  })
 
   table(res.se)
   table(res.flag)
@@ -143,4 +149,31 @@
   p1 <- NULL
   p1 <- ggplot(aes(x = time, y = dv), data = data)
   p1 <- p1 + geom_point(shape = 1)
-  p1 + geom_vline(xintercept = res.par[[465]], colour = "green4", linetype = "dashed")
+  p1 + geom_vline(xintercept = res.par[[831]], colour = "green4", linetype = "dashed")
+
+  # Used to determine resampling thresholds
+  # res.se <- mapply(res.par, res.hes, FUN = function(par, hes) {
+  #   vc_mat <- try(solve(hes))
+  #   if(class(vc_mat) != "try-error") {
+  #     se <- sqrt(diag(vc_mat))
+  #     if (!any(is.nan(se))) {
+  #       max_sepercent <- max(round(se/abs(par)*100))
+  #       if (max_sepercent < 50) {
+  #         "<50"
+  #       } else {
+  #         ">50"
+  #       }
+  #     } else {
+  #       "neg_vc_diag"
+  #     }
+  #   } else {
+  #     "singular"
+  #   }
+  # })
+
+  # Used to check parameters for difference in parameters for specific conditions
+  par.mat <- matrix(unlist(res.par[which(res.se < 20)]), nrow = length(t1) - 2)
+  apply(par.mat, 1, function(x) round(sd(x)/mean(x)*100, 2))
+
+  par.mat <- matrix(unlist(res.par[which(res.se > 30)]), nrow = length(t1) - 2)
+  apply(par.mat, 1, function(x) round(sd(x)/mean(x)*100, 2))
