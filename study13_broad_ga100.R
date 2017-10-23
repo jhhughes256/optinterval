@@ -58,16 +58,30 @@
       x$par
     })
     res.interv <- lapply(fit.par,
-      FUN = function(x) optim.interv.dt(x, t1)
+      FUN = function(x) optim.interv.ga100(x, t1)
     )
     t2 <- sapply(res.interv, FUN = function(x) {
-      c(0, round(x$times, 2), tlast)
+      c(0, round(x$par, 2), tlast)
     })
-    t3 <- t2
+    t3.tmax <- lapply(fit.par, tmax.sumexp)
+    res.interv.tmax <- mapply(fit.par, t3.tmax,
+      FUN = function(x, y) {
+        optim.interv.ga100(x, t1, tmax = y)
+      }, SIMPLIFY = F
+    )
+    t3 <- mapply(res.interv.tmax, t3.tmax,
+      FUN = function(x, y) {
+        z <- unique(c(0, round(x$par, 1), y, tlast))
+        return(z[order(z)])
+      }, SIMPLIFY = F
+    )
     auc <- data.frame(
       true = apply(par, 2, function(x) integrate(fn, 0, tlast, p = x)$value),
       basic = apply(par, 2, function(x) auc.interv(t1, x, fn)),
       optint = mapply(data.frame(par), data.frame(t2),
+        FUN = function(x, y) auc.interv(y, x, fn)
+      ),
+      optintwCmax = mapply(data.frame(par), data.frame(t3),
         FUN = function(x, y) auc.interv(y, x, fn)
       )
     )
@@ -75,6 +89,9 @@
       true = apply(par, 2, function(x) pred.sumexp(x, tmax.sumexp(x))),
       basic = apply(par, 2, function(x) max(pred.sumexp(x, t1))),
       optint = mapply(data.frame(par), data.frame(t2),
+        FUN = function(x, y) max(pred.sumexp(x, y))
+      ),
+      optintwCmax = mapply(data.frame(par), data.frame(t3),
         FUN = function(x, y) max(pred.sumexp(x, y))
       )
     )
@@ -84,6 +101,9 @@
         FUN = function(x, y) t1[which(pred.sumexp(x, t1) == y)][1]
       ),
       optint = mapply(data.frame(par), cmax$optint, data.frame(t2),
+        FUN = function(x, y, z) z[which(pred.sumexp(x, z) == y)][1]
+      ),
+      optintwCmax = mapply(data.frame(par), cmax$optintwCmax, data.frame(t3),
         FUN = function(x, y, z) z[which(pred.sumexp(x, z) == y)][1]
       )
     )

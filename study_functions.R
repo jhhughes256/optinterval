@@ -117,6 +117,9 @@
           counts = NULL, convergence = 0, message = NULL
         )
       } else {
+        if (is.na(lmres[2])) {
+          lmres <- c(max(y), -0.00001)
+        }
         gares <- ga("real-valued",
           mle.sumexp, x = x, y = y, ga = T, sigma = 0.01,
           min = c(rep(lmres[2]*50, i + oral), rep(lmres[1]-2, i)),
@@ -187,7 +190,7 @@
   # ga using times
   err.interv.ga <- function(par, exp.par, tfirst, tlast, tmax = NULL, a = F, ga = F) {
     z <- ifelse(ga, -1, 1)
-    times <- c(tfirst, par, tlast, tmax)
+    times <- unique(c(tfirst, par, tlast, tmax))
     times <- times[order(times)]
     deltat <- diff(times)
     if (a) {
@@ -254,19 +257,24 @@
       lower = tlast/48, upper = tlast - npar*tlast/48,
       exp.par = fit.par, tfirst = tfirst, tlast = tlast, a = absorp
     )
-    browser()
     res$times <- cumsum(res$par)
     return(res)
   }
 
   # using ga for initial parameters
-  optim.interv.ga <- function(fit.par, times, tmax = NULL) {
+  optim.interv.ga100 <- function(fit.par, times, tmax = NULL) {
     tfirst <- min(times)
     tlast <- max(times)
-    is.tmax <- ifelse(is.null(tmax), 2, 3)
+    if (is.null(tmax)) {
+      is.tmax <- 2
+    } else if (tmax == 0) {
+      is.tmax <- 2
+    } else {
+      is.tmax <- 3
+    }
     npar <- length(times) - is.tmax
     absorp <- ifelse((length(fit.par) %% 2) != 0, T, F)
-    flag <- 1
+    flag <- 0
     repeat {
       gares <- ga("real-valued",
         err.interv.ga, exp.par = fit.par, a = absorp,
@@ -291,8 +299,57 @@
         se <- sqrt(diag(vc_mat))
         if (!any(is.nan(se))) {
           se_percent <- se/res$par*100
-          if (max(se_percent) <= 50) {
+          if (max(se_percent) <= 100) {
             res$flag <- flag
+            res$se <- se_percent
+            break
+          }
+        }
+      }
+      flag <- flag + 1
+      if (flag == 10) {
+        res$flag <- flag
+        res$se <- NA
+        break
+      }
+    }
+    return(res)
+  }
+
+  optim.interv.ga50 <- function(fit.par, times, tmax = NULL) {
+    tfirst <- min(times)
+    tlast <- max(times)
+    is.tmax <- ifelse(is.null(tmax), 2, 3)
+    npar <- length(times) - is.tmax
+    absorp <- ifelse((length(fit.par) %% 2) != 0, T, F)
+    flag <- 0
+    repeat {
+      gares <- ga("real-valued",
+        err.interv.ga, exp.par = fit.par, a = absorp,
+        tfirst = tfirst, tlast = tlast, tmax = tmax, ga = T,
+        min = rep(tfirst + 0.01, npar), max = rep(tlast - 0.01, npar),
+        selection = gareal_lrSelection,
+        crossover = gareal_spCrossover,
+        mutation = gareal_raMutation,
+        maxiter = 50,
+        popSize = 250,
+        monitor = F
+      )
+      res <- optim(
+        gares@solution[order(gares@solution)],
+        err.interv.ga,
+        method = "BFGS", hessian = T,
+        exp.par = fit.par, tfirst = tfirst, tlast = tlast, tmax = tmax,
+        a = absorp
+      )
+      vc_mat <- try(solve(res$hessian))
+      if(class(vc_mat) != "try-error") {
+        se <- sqrt(diag(vc_mat))
+        if (!any(is.nan(se))) {
+          se_percent <- se/res$par*100
+          if (max(se_percent) <= 50 | flag == 10) {
+            res$flag <- flag
+            res$se <- se_percent
             break
           }
         }
@@ -301,6 +358,7 @@
     }
     return(res)
   }
+
 
 # -----------------------------------------------------------------------------
 # Determine tmax given a set of sumexp parameters
