@@ -137,7 +137,14 @@
           method = "BFGS", hessian = T,
           x = x, y = y, sigma = 0.01
         ))
-        if (class(optres) == "try-error") browser()
+        if (class(optres) == "try-error") {
+          try(optim(
+            gares@solution[1, ],
+            mle.sumexp,
+            method = "Nelder-Mead", hessian = T,
+            x = x, y = y, sigma = 0.01
+          ))
+        }
       }
       slope.par <- optres$par[1:(i+oral)]
       slope.ord <- order(slope.par, decreasing = T)
@@ -216,20 +223,12 @@
             popSize = 250,
             monitor = F
           )
-          optres <- try(optim(
+          optres <- optim(
             gares@solution[1, ],
             mle.sumexp,
             method = "BFGS", hessian = T,
             x = x, y = y, sigma = 0.01
-          ))
-          if (class(optres) == "try-error") {
-            try(optim(
-              gares@solution[1, ],
-              mle.sumexp,
-              method = "Nelder-Mead", hessian = T,
-              x = x, y = y, sigma = 0.01
-            ))
-          }
+          )
         }
       }
       slope.par <- optres$par[1:(i+oral)]
