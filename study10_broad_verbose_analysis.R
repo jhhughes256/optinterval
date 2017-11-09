@@ -194,7 +194,7 @@
   d.out2 <- d.outlier[with(d.outlier, test.nexp == 2 & metric == "auc" & type == "opt"), ]
   # View(d.out2[c("id", paste0("ref.", c("m1", "m2", "c")), paste0("test.", c("m1", "m2", "c1")), "prop")])
   m.out2.ref <- t(as.matrix(ddply(d.out2, .(id), function(x) {
-    with(x, c(ref.m1, ref.m2, ref.c))
+    with(x, c(ref.m1, ref.m2, ref.c1))
   })[, -1]))
   m.out2.test <- t(as.matrix(ddply(d.out2, .(id), function(x) {
     with(x, c(test.m1, test.m2, test.c1))

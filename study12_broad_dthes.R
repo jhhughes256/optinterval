@@ -50,7 +50,7 @@
     )
     subd <- data[which(time.samp %in% t1),]*err
     res.sumexp <- apply(subd, 2, function(x) {
-      chisq.sumexp(optim.sumexp.hes(
+      chisq.sumexp(optim.sumexp.se(
         data.frame(time = t1, conc = x), oral = absorp
       ))
     })
@@ -63,20 +63,11 @@
     t2 <- sapply(res.interv, FUN = function(x) {
       c(0, round(x$times, 2), tlast)
     })
-    t3.tmax <- sapply(fit.par, tmax.sumexp)
-    res.interv.tmax <- lapply(fit.par,
-      FUN = function(x) optim.interv.dtmax(x, t1, tmax = t3.tmax)
-    )
-    t3 <- sapply(res.interv.tmax, FUN = function(x) {
-      c(0, round(x$times, 2), tlast)
-    })
+    t3 <- t2
     auc <- data.frame(
       true = apply(par, 2, function(x) integrate(fn, 0, tlast, p = x)$value),
       basic = apply(par, 2, function(x) auc.interv(t1, x, fn)),
       optint = mapply(data.frame(par), data.frame(t2),
-        FUN = function(x, y) auc.interv(y, x, fn)
-      ),
-      optintwCmax = mapply(data.frame(par), data.frame(t3),
         FUN = function(x, y) auc.interv(y, x, fn)
       )
     )
@@ -84,9 +75,6 @@
       true = apply(par, 2, function(x) pred.sumexp(x, tmax.sumexp(x))),
       basic = apply(par, 2, function(x) max(pred.sumexp(x, t1))),
       optint = mapply(data.frame(par), data.frame(t2),
-        FUN = function(x, y) max(pred.sumexp(x, y))
-      ),
-      optintwCmax = mapply(data.frame(par), data.frame(t3),
         FUN = function(x, y) max(pred.sumexp(x, y))
       )
     )
@@ -97,12 +85,9 @@
       ),
       optint = mapply(data.frame(par), cmax$optint, data.frame(t2),
         FUN = function(x, y, z) z[which(pred.sumexp(x, z) == y)][1]
-      ),
-      optintwCmax = mapply(data.frame(par), cmax$optintwCmax, data.frame(t3),
-        FUN = function(x, y, z) z[which(pred.sumexp(x, z) == y)][1]
       )
     )
-    return(list(par = par, fit.par = fit.par, t2 = t2, t3 = t3, sumexp = res.sumexp, interv = res.interv, interv.tmax = res.interv.tmax, auc = auc, cmax = cmax, tmax = tmax))
+    return(list(par = par, fit.par = fit.par, t2 = t2, t3 = t3, sumexp = res.sumexp, interv = res.interv, auc = auc, cmax = cmax, tmax = tmax))
   }
 
 # -----------------------------------------------------------------------------

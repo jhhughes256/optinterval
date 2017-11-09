@@ -146,8 +146,8 @@
   # box.plot.fn("tmax", "d1a2", F, F, vplayout(1,2))
   # box.plot.fn("tmax", "d1a3", F, F, vplayout(1,3))
   box.plot.fn("auc", "d1a1", F, T, vplayout(1,1))
-  box.plot.fn("auc", "d1aj5", F, T, vplayout(1,2))
-  box.plot.fn("auc", "d1aj7", F, T, vplayout(1,3))
+  box.plot.fn("auc", "d1a2", F, T, vplayout(1,2))
+  box.plot.fn("auc", "d1a3", F, T, vplayout(1,3))
 
   dev.off()
 
@@ -160,7 +160,7 @@
   # forest.plot.fn("tmax", "d1a2", vplayout(2,1))
   # forest.plot.fn("tmax", "d1a3", vplayout(3,1))
   forest.plot.fn("tmax", "d1a1", vplayout(1,1))
-  forest.plot.fn("tmax", "d1aj5", vplayout(2,1))
-  forest.plot.fn("tmax", "d1aj6", vplayout(3,1))
+  forest.plot.fn("tmax", "d1a2", vplayout(2,1))
+  forest.plot.fn("tmax", "d1a3", vplayout(3,1))
 
   dev.off()

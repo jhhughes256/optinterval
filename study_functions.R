@@ -131,12 +131,106 @@
           popSize = 250,
           monitor = F
         )
+        optres <- try(optim(
+          gares@solution[1, ],
+          mle.sumexp,
+          method = "BFGS", hessian = T,
+          x = x, y = y, sigma = 0.01
+        ))
+        if (class(optres) == "try-error") browser()
+      }
+      slope.par <- optres$par[1:(i+oral)]
+      slope.ord <- order(slope.par, decreasing = T)
+      par.ord <- unname(c(slope.par[slope.ord], optres$par[(i+oral+1):length(optres$par)]))
+      opt.par[[i]] <- par.ord
+      opt.val[[i]] <- optres$value
+      opt.gra[[i]] <- optres$counts
+      opt.con[[i]] <- optres$convergence
+      opt.mes[[i]] <- ifelse(is.null(optres$message),
+        "NULL", optres$message)
+      opt.hes[[i]] <- optres$hessian
+    }
+    res <- list(par = opt.par, value = opt.val, counts = opt.gra,
+      convergence = opt.con, message = opt.mes, hessian = opt.hes)
+    res
+  }
+
+  optim.sumexp.se <- function(data, oral = F, nexp = 3) {
+    x <- data[which(data[, 2] > 0 & data[, 1] != 0), 1]
+    y <- data[which(data[, 2] > 0 & data[, 1] != 0), 2]
+    opt.par <- list(NULL)
+    opt.val <- list(NULL)
+    opt.gra <- list(NULL)
+    opt.con <- list(NULL)
+    opt.mes <- list(NULL)
+    opt.hes <- list(NULL)
+    lm.sub <- which(y == max(y))[1]:length(y)
+    lmres <- unname(lm(log(y[lm.sub]) ~ x[lm.sub])$coefficients)
+    for (i in 1:nexp) {
+      if (i == 1 & !oral) {
+        optres <- list(
+          par = c(lmres[2], lmres[1]),
+          value = mle.sumexp(unname(c(lmres[2], lmres[1])), x, y, 0.01),
+          counts = NULL, convergence = 0, message = NULL
+        )
+      } else {
+        if (is.na(lmres[2])) {
+          lmres <- c(max(y), -0.00001)
+        }
+        gares <- ga("real-valued",
+          mle.sumexp, x = x, y = y, ga = T, sigma = 0.01,
+          min = c(rep(lmres[2]*50, i + oral), rep(lmres[1]-2, i)),
+          max = c(rep(lmres[2]/50, i + oral), rep(lmres[1]+2, i)),
+          selection = gareal_lrSelection,
+          crossover = gareal_spCrossover,
+          mutation = gareal_raMutation,
+          maxiter = 50,
+          popSize = 250,
+          monitor = F
+        )
         optres <- optim(
           gares@solution[1, ],
           mle.sumexp,
           method = "BFGS", hessian = T,
           x = x, y = y, sigma = 0.01
         )
+        repeat {
+          vc_mat <- suppressWarnings(try(solve(optres$hessian)))
+          if(class(vc_mat) != "try-error") {
+            se <- suppressWarnings(sqrt(diag(vc_mat)))
+            if (!any(is.nan(se))) {
+              se_percent <- se/optres$par*100
+              if (max(se_percent) <= 100) {
+                break
+              }
+            }
+          }
+          gares <- ga("real-valued",
+            mle.sumexp, x = x, y = y, ga = T, sigma = 0.01,
+            min = c(rep(lmres[2]*50, i + oral), rep(lmres[1]-2, i)),
+            max = c(rep(lmres[2]/50, i + oral), rep(lmres[1]+2, i)),
+            selection = gareal_lrSelection,
+            crossover = gareal_spCrossover,
+            mutation = gareal_raMutation,
+            maxiter = 50,
+            popSize = 250,
+            monitor = F
+          )
+          optres <- try(optim(
+            gares@solution[1, ],
+            mle.sumexp,
+            method = "BFGS", hessian = T,
+            x = x, y = y, sigma = 0.01
+          ))
+          if (class(optres) == "try-error") {
+            try(optim(
+              gares@solution[1, ],
+              mle.sumexp,
+              method = "Nelder-Mead", hessian = T,
+              x = x, y = y, sigma = 0.01
+            ))
+          }
+        }
       }
       slope.par <- optres$par[1:(i+oral)]
       slope.ord <- order(slope.par, decreasing = T)
@@ -223,6 +317,23 @@
     return(sum(err^2))
   }
 
+  err.interv.dtmax <- function(par, exp.par, tfirst, tlast, a = F, tmax = NULL) {
+    times <- c(tfirst, cumsum(par), tmax, tlast)
+    times <- sort(times)
+    deltat <- diff(times)
+    if (a) {
+      all.secd <- abs(pred.sumexp(exp.par, times, 2))
+      secd <- c(NULL)
+      for (i in 1:(length(times)-1)) {
+        secd[i] <- all.secd[which(all.secd == max(all.secd[c(i, i + 1)]))][1]
+      }
+    } else {
+      secd <- pred.sumexp(exp.par, times[-length(times)], 2)
+    }
+    err <- deltat^3*secd/12
+    return(sum(err^2))
+  }
+
 # Interval optimising function
   # standard using times
   optim.interv <- function(times, fit.par, tmax = NULL) {
@@ -258,6 +369,23 @@
       exp.par = fit.par, tfirst = tfirst, tlast = tlast, a = absorp
     )
     res$times <- cumsum(res$par)
+    return(res)
+  }
+
+  optim.interv.dtmax <- function(fit.par, times, tmax = NULL) {
+    tfirst <- min(times)
+    tlast <- max(times)
+    npar <- length(times) - 2
+    absorp <- ifelse((length(fit.par) %% 2) != 0, T, F)
+    init.par <- cumsum(rep(tlast/48, npar))
+    res <- optim(
+      init.par,
+      err.interv.dtmax,
+      method = "L-BFGS-B", hessian = T,
+      lower = tlast/48, upper = tlast - npar*tlast/48,
+      exp.par = fit.par, tfirst = tfirst, tlast = tlast, a = absorp, tmax = tmax
+    )
+    res$times <- sort(c(cumsum(res$par), tmax))
     return(res)
   }
 
