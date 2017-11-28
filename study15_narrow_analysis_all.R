@@ -33,13 +33,7 @@
   source(paste(git.dir, reponame, "sumstat_functions.R", sep = "/"))
 
 # Source data
-  d1a <- readRDS(paste(git.dir, reponame, "fn_diag/d1a-narrow-dt.rds", sep = "/"))
-  d1a.user <- readRDS(paste(git.dir, reponame, "d1a-narrow-user.rds", sep = "/"))
-
-  user.auc <- unique(with(d1a.user$auc, user/true))
-  user.cmax <- unique(with(d1a.user$cmax, user/true))
-  user.tmax <- unique(with(d1a.user$tmax, user/true))
-  c(user.auc, user.cmax, user.tmax)
+  rdsdata <- readRDS(paste(git.dir, reponame, "fn_diag/d3b-narrow-dt.rds", sep = "/"))
 
 # -----------------------------------------------------------------------------
 # Data structure
@@ -50,7 +44,7 @@
   res <- data.frame(NULL)
   plotdata <- data.frame(NULL)
   for (i in 1:3) {  # 1:5) {
-    d.in <- d1a[[slot.names[i]]]
+    d.in <- rdsdata[[slot.names[i]]]
     d.melt <- data.frame(
       metric = slot.names[i],
       ref = rep(d.in$true, 2),
@@ -65,20 +59,21 @@
   }
 
 # -----------------------------------------------------------------------------
-  box.plot.fn <- function(metric, user, x, zoom, layout = NULL) {
+  box.plot.fn <- function(metric, x, zoom, layout = NULL) {
     subplot <- plotdata[plotdata$metric == metric & plotdata$type != "bas", ]
     subplot$type <- as.factor(subplot$type)
     levels(subplot$type) <- c("Optint", "Optint w/ Cmax")
 
     plotobj <- ggplot(subplot, aes(x = type, y = prop))
     plotobj <- plotobj + geom_boxplot()
+    plotobj <- plotobj + geom_hline(yintercept = 0.8, color = "red", linetype = "dashed")
     plotobj <- plotobj + geom_hline(yintercept = 1, color = "green4", linetype = "dashed")
-    plotobj <- plotobj + geom_hline(yintercept = user, color = "red", linetype = "dashed")
+    plotobj <- plotobj + geom_hline(yintercept = 1.25, color = "red", linetype = "dashed")
     plotobj <- plotobj + ggtitle(paste("Metric:", metric))
     plotobj <- plotobj + xlab("\nMethod")
     plotobj <- plotobj + ylab("Method/Reference Ratio\n")
     if (zoom) {
-      lim.check <- c(boxplot.stats(subplot$prop)$stats[c(1, 5)], user)
+      lim.check <- c(boxplot.stats(subplot$prop)$stats[c(1, 5)])
       ylim.box <- c(min(lim.check), max(lim.check))
       plotobj <- plotobj + coord_cartesian(ylim = ylim.box)
     }
@@ -89,7 +84,7 @@
     else print(plotobj, vp = layout)
   }
 
-  forest.plot.fn <- function(metric, user, zoom, layout = NULL) {
+  forest.plot.fn <- function(metric, zoom, layout = NULL) {
     subplot <- res[res$metric == metric & res$type != "bas", ]
     subplot$type <- factor(subplot$type, levels = rev(subplot$type))
     levels(subplot$type) <- c("Optint w/ Cmax", "Optint")
@@ -103,12 +98,11 @@
     plotobj <- plotobj + geom_linerange(aes(ymin = q025, ymax = q975), color = "red")
     plotobj <- plotobj + geom_pointrange(aes(ymin = q25, ymax = q75))
     plotobj <- plotobj + geom_hline(yintercept = c(0.8, 1.25), lty = 2, color = "green4")
-    plotobj <- plotobj + geom_hline(yintercept = user, color = "red", linetype = "dashed")
     plotobj <- plotobj + ggtitle(paste("Metric:", metric))
     plotobj <- plotobj + xlab("\nMethod")
     plotobj <- plotobj + scale_y_continuous("Method/Reference Ratio\n")
     if (zoom) {
-      lim.check <- c(boxplot.stats(subplot$prop)$stats[c(1, 5)], user)
+      lim.check <- c(boxplot.stats(subplot$prop)$stats[c(1, 5)])
       ylim.box <- c(min(lim.check), max(lim.check))
       plotobj <- plotobj + coord_cartesian(ylim = ylim.box)
     }
@@ -119,13 +113,13 @@
 
 # -----------------------------------------------------------------------------
 
-  box.plot.fn("auc", user.auc, F, F)
-  box.plot.fn("cmax", user.cmax, F, T)
-  box.plot.fn("tmax", user.tmax, F, T)
+  box.plot.fn("auc", F, F)
+  box.plot.fn("cmax", F, T)
+  box.plot.fn("tmax", F, T)
 
-  forest.plot.fn("auc", user.auc, F)
+  forest.plot.fn("auc", F)
   # ggsave("narrow_forest_auc.png")
-  forest.plot.fn("cmax", user.cmax, F)
+  forest.plot.fn("cmax", F)
   # ggsave("narrow_forest_cmax.png")
-  forest.plot.fn("tmax", user.tmax, F)
+  forest.plot.fn("tmax", F)
   # ggsave("narrow_forest_tmax.png")

@@ -30,13 +30,13 @@
   source(paste(git.dir, reponame, "sumstat_functions.R", sep = "/"))
 
 # Source files of interest
-  sumexp.string <- "d2a"
-  ref.string <- "dt05-RMSE"
-  test.string <- "dt15-RMSE"
+  sumexp.string <- "d1a"
+  ref.string <- "dt05"
+  test.string <- "dt15"
   ref <- readRDS(paste(git.dir, reponame,
-    paste0("fn_diag/", sumexp.string, "-broad-", ref.string, ".rds"), sep = "/"))
+    paste0("fn_diag/", sumexp.string, "-narrow-", ref.string, ".rds"), sep = "/"))
   test <- readRDS(paste(git.dir, reponame,
-    paste0("fn_diag/", sumexp.string, "-broad-", test.string, ".rds"), sep = "/"))
+    paste0("fn_diag/", sumexp.string, "-narrow-", test.string, ".rds"), sep = "/"))
 
 # -----------------------------------------------------------------------------
 # Data structure
@@ -50,12 +50,8 @@
     r.out <- data.frame(NULL)
     d.out <- data.frame(NULL)
     ref.par.nexp <- ceiling(dim(get(data.names[i])[["par"]])[1]/2)
-    ref.par.m <- apply(get(data.names[i])[["par"]], 2, function(x) {
-      x[1:ceiling(length(x)/2)]
-    })
-    ref.par.c <- apply(get(data.names[i])[["par"]], 2, function(x) {
-      x[-(1:ceiling(length(x)/2))]
-    })
+    ref.par.m <- get(data.names[i])[["par"]][1:ceiling(length(get(data.names[i])[["par"]])/2)]
+    ref.par.c <- get(data.names[i])[["par"]][-(1:ceiling(length(get(data.names[i])[["par"]])/2))]
     fit.par.nexp <- unlist(lapply(get(data.names[i])[["fit.par"]], function(x) {
       ceiling(length(x)/2)
     }))
@@ -94,16 +90,6 @@
           rep(NA, 4)
         }
       })
-      fit.par.tse <- lapply(get(data.names[i])[["interv"]], function(x) {
-        vc_mat <- try(solve(x$hessian))
-        if(class(vc_mat) != "try-error") {
-          se <- sqrt(diag(vc_mat))
-          se_percent <- abs(se/x$par*100)
-          max(se_percent, na.rm = T)
-        } else {
-          NA
-        }
-      })
     }
     for (j in 1:3) {
       d.in <- get(data.names[i])[[slot.names[j]]]
@@ -112,38 +98,30 @@
         data = data.names[i],
         metric = slot.names[j],
         ref = rep(d.in$true, 3),
-        test = c(d.in$basic,
+        test = c(d.in$user,
           d.in$optint,
           d.in$optintwCmax),
         type = c(rep("bas", niter), rep("opt", niter), rep("optc", niter)),
-        ref.m1 = ref.par.m[1,],
-        ref.m2 = ref.par.m[2,],
-        ref.m3 = if (dim(ref.par.m)[1] > 2) {
-            ref.par.m[3,]
+        ref.m1 = ref.par.m[1],
+        ref.m2 = ref.par.m[2],
+        ref.m3 = if (length(ref.par.m) > 2) {
+            ref.par.m[3]
           } else {
             NA
           },
-        ref.m4 = if (dim(ref.par.m)[1] > 3) {
-            ref.par.m[4,]
+        ref.m4 = if (length(ref.par.m) > 3) {
+            ref.par.m[4]
           } else {
             NA
           },
-        ref.c1 = if (is.vector(ref.par.c)) {
-            ref.par.c
-          } else {
-            ref.par.c[1,]
-          },
-        ref.c2 = if (is.vector(ref.par.c)) {
-            NA
-          } else if (dim(ref.par.c)[1] > 1) {
-            ref.par.c[2,]
+        ref.c1 = ref.par.c[1],
+        ref.c2 = if (length(ref.par.c) > 1) {
+            ref.par.c[2]
           } else {
             NA
           },
-        ref.c3 = if (is.vector(ref.par.c)) {
-            NA
-          } else if (dim(ref.par.c)[1] > 2) {
-            ref.par.c[3,]
+        ref.c3 = if (length(ref.par.c) > 2) {
+            ref.par.c[3]
           } else {
             NA
           },
@@ -155,22 +133,22 @@
         test.c1 = unlist(lapply(fit.par.c, function(x) x[1])),
         test.c2 = unlist(lapply(fit.par.c, function(x) x[2])),
         test.c3 = unlist(lapply(fit.par.c, function(x) x[3])),
-        test.m1se = unlist(lapply(fit.par.mse, function(x) x[1])),
-        test.m2se = unlist(lapply(fit.par.mse, function(x) x[2])),
-        test.m3se = unlist(lapply(fit.par.mse, function(x) x[3])),
-        test.m4se = unlist(lapply(fit.par.mse, function(x) x[4])),
-        test.c1se = unlist(lapply(fit.par.cse, function(x) x[1])),
-        test.c2se = unlist(lapply(fit.par.cse, function(x) x[2])),
-        test.c3se = unlist(lapply(fit.par.cse, function(x) x[3])),
-        t2.1 = get(data.names[i])[["t2"]][1,],
-        t2.2 = get(data.names[i])[["t2"]][2,],
-        t2.3 = get(data.names[i])[["t2"]][3,],
-        t2.4 = get(data.names[i])[["t2"]][4,],
-        t2.5 = get(data.names[i])[["t2"]][5,],
-        t2.6 = get(data.names[i])[["t2"]][6,],
-        t2.7 = get(data.names[i])[["t2"]][7,],
-        t2.8 = get(data.names[i])[["t2"]][8,],
-        t2.9 = get(data.names[i])[["t2"]][9,],
+        # test.m1se = unlist(lapply(fit.par.mse, function(x) x[1])),
+        # test.m2se = unlist(lapply(fit.par.mse, function(x) x[2])),
+        # test.m3se = unlist(lapply(fit.par.mse, function(x) x[3])),
+        # test.m4se = unlist(lapply(fit.par.mse, function(x) x[4])),
+        # test.c1se = unlist(lapply(fit.par.cse, function(x) x[1])),
+        # test.c2se = unlist(lapply(fit.par.cse, function(x) x[2])),
+        # test.c3se = unlist(lapply(fit.par.cse, function(x) x[3])),
+        t2.1 = get(data.names[i])[["t2"]][2,],
+        t2.2 = get(data.names[i])[["t2"]][3,],
+        t2.3 = get(data.names[i])[["t2"]][4,],
+        t2.4 = get(data.names[i])[["t2"]][5,],
+        t2.5 = get(data.names[i])[["t2"]][6,],
+        t2.6 = get(data.names[i])[["t2"]][7,],
+        t2.7 = get(data.names[i])[["t2"]][8,],
+        t2.8 = get(data.names[i])[["t2"]][9,],
+        t2.9 = get(data.names[i])[["t2"]][10,],
         t3.1 = get(data.names[i])[["t3"]][1,],
         t3.2 = get(data.names[i])[["t3"]][2,],
         t3.3 = get(data.names[i])[["t3"]][3,],
@@ -179,8 +157,8 @@
         t3.6 = get(data.names[i])[["t3"]][6,],
         t3.7 = get(data.names[i])[["t3"]][7,],
         t3.8 = get(data.names[i])[["t3"]][8,],
-        t3.9 = get(data.names[i])[["t3"]][9,],
-        tse = unlist(fit.par.tse)
+        t3.9 = get(data.names[i])[["t3"]][9,]#,
+        # tse = unlist(fit.par.tse)
       )
       d.melt$prop <- with(d.melt, test/ref)
       r.out <- rbind(r.out,
@@ -228,57 +206,6 @@
     else print(plotobj, vp = layout)
   }
 
-  violin.plot.fn <- function(metric, data, x, zoom, layout = NULL) {
-    subplot <- plotdata[plotdata$metric == metric & plotdata$data == data, ]
-    subplot$type <- as.factor(subplot$type)
-    levels(subplot$type) <- c("Basic", "Optint", "Optint w/ Cmax")
-    # subplot$type <- factor(subplot$type, levels = rev(unique(subplot$type)))
-    # levels(subplot$type) <- c("Optint w/ Cmax", "Optint", "Basic")
-
-    plotobj <- ggplot(subplot, aes(x = type, y = prop))
-    plotobj <- plotobj + geom_hline(yintercept = 1, color = "green4", linetype = "dashed")
-    plotobj <- plotobj + geom_violin(aes(fill = type))
-    plotobj <- plotobj + geom_boxplot(width=0.1)
-    # plotobj <- plotobj + ggtitle(paste("Metric:", metric))
-    plotobj <- plotobj + ggtitle(paste(metric, data))
-    plotobj <- plotobj + xlab("\nMethod")
-    plotobj <- plotobj + ylab("Method/Reference Ratio\n")
-    if (zoom) {
-      ylim.box <- boxplot.stats(subplot$prop)$stats[c(1, 5)]
-      # ylim.box <- c(0.2, 1.5)
-      plotobj <- plotobj + coord_cartesian(ylim = ylim.box)
-    }
-    if (x) plotobj <- plotobj + stat_summary(fun.y = mean, geom = "point", shape = 4, size = 4)
-    # plotobj <- plotobj + coord_flip()
-    if (is.null(layout)) print(plotobj)
-    else print(plotobj, vp = layout)
-  }
-
-  forest.plot.fn <- function(metric, data, layout = NULL) {
-    subplot <- res[res$metric == metric & res$data == data, ]
-    subplot$type <- factor(subplot$type, levels = rev(subplot$type))
-    levels(subplot$type) <- c("Optint w/ Cmax", "Optint", "Basic")
-    subplot$median <- as.numeric(subplot$median)
-    subplot$q025 <- as.numeric(subplot$q025)
-    subplot$q25 <- as.numeric(subplot$q25)
-    subplot$q75 <- as.numeric(subplot$q75)
-    subplot$q975 <- as.numeric(subplot$q975)
-
-    plotobj <- ggplot(subplot, aes(x = type, y = median))
-    plotobj <- plotobj + geom_linerange(aes(ymin = q025, ymax = q975), color = "red")
-    plotobj <- plotobj + geom_linerange(aes(ymin = q25, ymax = q75), size = 1.2)
-    plotobj <- plotobj + geom_pointrange(aes(ymin = median, ymax = median), size = 0.8)
-    plotobj <- plotobj + geom_hline(yintercept = 1, lty = 2, color = "green4")
-    # plotobj <- plotobj + ggtitle(paste("Metric:", metric))
-    plotobj <- plotobj + ggtitle(paste(metric, "j ==", unique(subplot$j)))
-    plotobj <- plotobj + xlab("\nMethod")
-    plotobj <- plotobj + scale_y_continuous("Method/Reference Ratio\n",
-      lim = c(0.2, 4)) # auc - lim = c(0.35, 2.4)), cmax - c(0.2, 1.05)), tmax - c(0.2, 4))
-    plotobj <- plotobj + coord_flip()
-    if (is.null(layout)) print(plotobj)
-    else print(plotobj, vp = layout)
-  }
-
 # -----------------------------------------------------------------------------
 # Plot data
   # png("broad_new_boxplot_auc.png", width = 360, height = 480)
@@ -297,16 +224,66 @@
 
   dev.off()
 
-  # png("broad_new_forestplot_tmax.png", width = 720, height = 480)
-  vplayout <- function(x, y) viewport(layout.pos.row = x, layout.pos.col = y)
-  grid.newpage()
-  pushViewport(viewport(layout = grid.layout(2, 1)))
+# -----------------------------------------------------------------------------
+  pred.sumexp <- function(x, t, d = 0) {
+    l <- length(x)
+    a <- ifelse(l %% 2 == 0, 0, 1)
+    n <- ceiling(l/2)
+    m <- x[1:n]
+    ord <- order(m, decreasing = T)
+    p <- c(m[ord], x[(n+1):l])
+    for (i in 1:n) {
+      if (i == 1) y <- p[i]^d*exp(p[i]*t + p[n+i])
+      else if (i != n | a == 0) y <- y + p[i]^d*exp(p[i]*t + p[n+i])
+      else if (a == 1) y <- y - p[i]^d*exp(p[i]*t)*sum(exp(p[(n+1):(2*n-1)]))
+    }
+    return(y)
+  }
 
-  forest.plot.fn("tmax", "ref", vplayout(1,1))
-  forest.plot.fn("tmax", "test", vplayout(2,1))
 
-  dev.off()
+  subdata <- plotdata[plotdata$type == "opt" & plotdata$metric == "auc",]
+  timedata <- data.frame(mean = NULL, CI90lo = NULL, CI90hi = NULL)
 
-  violin.plot.fn("auc", "test", F, F)
-  violin.plot.fn("cmax", "test", F, F)
-  violin.plot.fn("tmax", "test", F, F)
+  subpar <- as.numeric(na.omit(as.numeric(subdata[1, 7:13])))
+  subpartimes <- seq(0, 24, by = 0.1)
+  subpardata <- data.frame(
+    time = subpartimes,
+    dv = pred.sumexp(subpar, subpartimes)
+  )
+
+  timedata <- ddply(subdata, .(data), function(x) {
+    meantime <- c(0, mean(x$t2.2), mean(x$t2.3), mean(x$t2.4), mean(x$t2.5), mean(x$t2.6), mean(x$t2.7), mean(x$t2.8), 24)
+    ci90lotime <- c(
+      quantile(x$t2.2, probs = 0.05, na.rm = T, names = F),
+      quantile(x$t2.3, probs = 0.05, na.rm = T, names = F),
+      quantile(x$t2.4, probs = 0.05, na.rm = T, names = F),
+      quantile(x$t2.5, probs = 0.05, na.rm = T, names = F),
+      quantile(x$t2.6, probs = 0.05, na.rm = T, names = F),
+      quantile(x$t2.7, probs = 0.05, na.rm = T, names = F),
+      quantile(x$t2.8, probs = 0.05, na.rm = T, names = F)
+    )
+    ci90hitime <- c(
+      quantile(x$t2.2, probs = 0.95, na.rm = T, names = F),
+      quantile(x$t2.3, probs = 0.95, na.rm = T, names = F),
+      quantile(x$t2.4, probs = 0.95, na.rm = T, names = F),
+      quantile(x$t2.5, probs = 0.95, na.rm = T, names = F),
+      quantile(x$t2.6, probs = 0.95, na.rm = T, names = F),
+      quantile(x$t2.7, probs = 0.95, na.rm = T, names = F),
+      quantile(x$t2.8, probs = 0.95, na.rm = T, names = F)
+    )
+    data.frame(
+      time = meantime,
+      dv = pred.sumexp(subpar, meantime),
+      ci90lo = c(NA, ci90lotime, NA),
+      ci90hi = c(NA, ci90hitime, NA)
+    )
+  })
+
+  p <- NULL
+  p <- ggplot()
+  p <- p + geom_line(aes(x = time, y = dv), data = subpardata, colour = "blue", size = 0.8)
+  p <- p + geom_line(aes(x = time, y = dv), data = timedata, colour = "green4", linetype = "dashed", size = 0.8)
+  p <- p + geom_point(aes(x = time, y = dv), data = timedata, size = 1.5, colour = "red")
+  p <- p + geom_errorbarh(aes(y = dv, xmin = ci90lo, xmax = ci90hi, x = time), data = timedata, colour = "black", size = 1, height = 0.6)
+  p <- p + facet_wrap(~data, ncol = 1)
+  p

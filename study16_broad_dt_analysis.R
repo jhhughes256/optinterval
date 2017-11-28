@@ -1,4 +1,4 @@
-# A script designed to determine algorithm improvement
+# Printing of result tables
 # -----------------------------------------------------------------------------
 # Set up directories
   if (!exists("git.dir")) {
@@ -30,17 +30,21 @@
   source(paste(git.dir, reponame, "sumstat_functions.R", sep = "/"))
 
 # Source files of interest
-  sumexp.string <- "d2a"
-  ref.string <- "dt05-RMSE"
-  test.string <- "dt15-RMSE"
-  ref <- readRDS(paste(git.dir, reponame,
-    paste0("fn_diag/", sumexp.string, "-broad-", ref.string, ".rds"), sep = "/"))
-  test <- readRDS(paste(git.dir, reponame,
-    paste0("fn_diag/", sumexp.string, "-broad-", test.string, ".rds"), sep = "/"))
+  run.string <- "dt15-RMSE"
+  d2b <- readRDS(paste(git.dir, reponame,
+    paste0("fn_diag/d2b-broad-", run.string, ".rds"), sep = "/"))
+  d3b <- readRDS(paste(git.dir, reponame,
+    paste0("fn_diag/d3b-broad-", run.string, ".rds"), sep = "/"))
+  d1a <- readRDS(paste(git.dir, reponame,
+    paste0("fn_diag/d1a-broad-", run.string, ".rds"), sep = "/"))
+  d2a <- readRDS(paste(git.dir, reponame,
+    paste0("fn_diag/d2a-broad-", run.string, ".rds"), sep = "/"))
+  d3a <- readRDS(paste(git.dir, reponame,
+    paste0("fn_diag/d3a-broad-", run.string, ".rds"), sep = "/"))
 
 # -----------------------------------------------------------------------------
 # Data structure
-  data.names <- c("ref", "test")
+  data.names <- c("d2b", "d3b", "d1a", "d2a", "d3a")
   slot.names <- c("auc", "cmax", "tmax")
   niter <- 1000
 
@@ -204,109 +208,54 @@
     plotdata <- rbind(plotdata, d.out)
   }
 # -----------------------------------------------------------------------------
-# Plots
+# Table
+  broad.out <- ddply(plotdata, .(data, type, metric), function(x) {
+    prop <- with(x, test/ref)
+    stat1 <-  mean(prop, na.rm = T)
+    stat2 <-  sd(prop, na.rm = T)
+    out <- data.frame(
+      mean = stat1,
+      sd = stat2,
+      cv = stat2/stat1*100,
+      median = median(prop, na.rm = T),
+      CI90lo = quantile(prop, probs = 0.05, na.rm = T, names = F),
+      CI90hi = quantile(prop, probs = 0.95, na.rm = T, names = F),
+      n = length(na.omit(prop))
+    )
+  })
+  write.csv(broad.out, "broad-output.csv")
 
-  box.plot.fn <- function(metric, data, x, zoom, layout = NULL) {
-    subplot <- plotdata[plotdata$metric == metric & plotdata$data == data, ]
-    subplot$type <- as.factor(subplot$type)
-    levels(subplot$type) <- c("Basic", "Optint", "Optint w/ Cmax")
+# Plot
+  plotdata <- plotdata[plotdata$type != "optc", ]
+  plotdata$typef <- as.factor(plotdata$type)
+  levels(plotdata$typef) <- c("Basic", "Optint", "Optint w/ Cmax")
+  plotauc <- plotdata[plotdata$metric == "auc", ]
+  plotcmax <- plotdata[plotdata$metric == "cmax" & plotdata$data %in% c("d1a", "d2a", "d3a"), ]
+  plottmax <- plotdata[plotdata$metric == "tmax" & plotdata$data %in% c("d1a", "d2a", "d3a"), ]
 
-    plotobj <- ggplot(subplot, aes(x = type, y = prop))
-    plotobj <- plotobj + geom_hline(yintercept = 1, color = "green4", linetype = "dashed")
-    plotobj <- plotobj + geom_boxplot()
-    # plotobj <- plotobj + ggtitle(paste("Metric:", metric))
-    plotobj <- plotobj + ggtitle(paste(metric, data))
-    plotobj <- plotobj + xlab("\nMethod")
-    plotobj <- plotobj + ylab("Method/Reference Ratio\n")
-    if (zoom) {
-      ylim.box <- boxplot.stats(subplot$prop)$stats[c(1, 5)]
-      # ylim.box <- c(0.2, 1.5)
-      plotobj <- plotobj + coord_cartesian(ylim = ylim.box)
-    }
-    if (x) plotobj <- plotobj + stat_summary(fun.y = mean, geom = "point", shape = 4, size = 4)
-    if (is.null(layout)) print(plotobj)
-    else print(plotobj, vp = layout)
-  }
+  p1 <- ggplot(plotauc, aes(x = typef, y = prop))
+  p1 <- p1 + geom_hline(yintercept = 1, color = "green4", linetype = "dashed")
+  p1 <- p1 + geom_boxplot()
+  p1 <- p1 + ggtitle("Broad Study AUC")
+  p1 <- p1 + xlab("\nMethod")
+  p1 <- p1 + ylab("Method/Reference Ratio\n")
+  p1 <- p1 + facet_wrap(~data, nrow = 1)
+  p1
 
-  violin.plot.fn <- function(metric, data, x, zoom, layout = NULL) {
-    subplot <- plotdata[plotdata$metric == metric & plotdata$data == data, ]
-    subplot$type <- as.factor(subplot$type)
-    levels(subplot$type) <- c("Basic", "Optint", "Optint w/ Cmax")
-    # subplot$type <- factor(subplot$type, levels = rev(unique(subplot$type)))
-    # levels(subplot$type) <- c("Optint w/ Cmax", "Optint", "Basic")
+  p2 <- ggplot(plotcmax, aes(x = typef, y = prop))
+  p2 <- p2 + geom_hline(yintercept = 1, color = "green4", linetype = "dashed")
+  p2 <- p2 + geom_boxplot()
+  p2 <- p2 + ggtitle("Broad Study Cmax")
+  p2 <- p2 + xlab("\nMethod")
+  p2 <- p2 + ylab("Method/Reference Ratio\n")
+  p2 <- p2 + facet_wrap(~data, nrow = 1)
+  p2
 
-    plotobj <- ggplot(subplot, aes(x = type, y = prop))
-    plotobj <- plotobj + geom_hline(yintercept = 1, color = "green4", linetype = "dashed")
-    plotobj <- plotobj + geom_violin(aes(fill = type))
-    plotobj <- plotobj + geom_boxplot(width=0.1)
-    # plotobj <- plotobj + ggtitle(paste("Metric:", metric))
-    plotobj <- plotobj + ggtitle(paste(metric, data))
-    plotobj <- plotobj + xlab("\nMethod")
-    plotobj <- plotobj + ylab("Method/Reference Ratio\n")
-    if (zoom) {
-      ylim.box <- boxplot.stats(subplot$prop)$stats[c(1, 5)]
-      # ylim.box <- c(0.2, 1.5)
-      plotobj <- plotobj + coord_cartesian(ylim = ylim.box)
-    }
-    if (x) plotobj <- plotobj + stat_summary(fun.y = mean, geom = "point", shape = 4, size = 4)
-    # plotobj <- plotobj + coord_flip()
-    if (is.null(layout)) print(plotobj)
-    else print(plotobj, vp = layout)
-  }
-
-  forest.plot.fn <- function(metric, data, layout = NULL) {
-    subplot <- res[res$metric == metric & res$data == data, ]
-    subplot$type <- factor(subplot$type, levels = rev(subplot$type))
-    levels(subplot$type) <- c("Optint w/ Cmax", "Optint", "Basic")
-    subplot$median <- as.numeric(subplot$median)
-    subplot$q025 <- as.numeric(subplot$q025)
-    subplot$q25 <- as.numeric(subplot$q25)
-    subplot$q75 <- as.numeric(subplot$q75)
-    subplot$q975 <- as.numeric(subplot$q975)
-
-    plotobj <- ggplot(subplot, aes(x = type, y = median))
-    plotobj <- plotobj + geom_linerange(aes(ymin = q025, ymax = q975), color = "red")
-    plotobj <- plotobj + geom_linerange(aes(ymin = q25, ymax = q75), size = 1.2)
-    plotobj <- plotobj + geom_pointrange(aes(ymin = median, ymax = median), size = 0.8)
-    plotobj <- plotobj + geom_hline(yintercept = 1, lty = 2, color = "green4")
-    # plotobj <- plotobj + ggtitle(paste("Metric:", metric))
-    plotobj <- plotobj + ggtitle(paste(metric, "j ==", unique(subplot$j)))
-    plotobj <- plotobj + xlab("\nMethod")
-    plotobj <- plotobj + scale_y_continuous("Method/Reference Ratio\n",
-      lim = c(0.2, 4)) # auc - lim = c(0.35, 2.4)), cmax - c(0.2, 1.05)), tmax - c(0.2, 4))
-    plotobj <- plotobj + coord_flip()
-    if (is.null(layout)) print(plotobj)
-    else print(plotobj, vp = layout)
-  }
-
-# -----------------------------------------------------------------------------
-# Plot data
-  # png("broad_new_boxplot_auc.png", width = 360, height = 480)
-  vplayout <- function(x, y) viewport(layout.pos.row = x, layout.pos.col = y)
-  grid.newpage()
-  pushViewport(viewport(layout = grid.layout(1, 2)))
-
-  box.plot.fn("auc", "ref", F, F, vplayout(1,1))
-  box.plot.fn("auc", "test", F, F, vplayout(1,2))
-
-  box.plot.fn("cmax", "ref", F, F, vplayout(1,1))
-  box.plot.fn("cmax", "test", F, F, vplayout(1,2))
-
-  box.plot.fn("tmax", "ref", F, F, vplayout(1,1))
-  box.plot.fn("tmax", "test", F, F, vplayout(1,2))
-
-  dev.off()
-
-  # png("broad_new_forestplot_tmax.png", width = 720, height = 480)
-  vplayout <- function(x, y) viewport(layout.pos.row = x, layout.pos.col = y)
-  grid.newpage()
-  pushViewport(viewport(layout = grid.layout(2, 1)))
-
-  forest.plot.fn("tmax", "ref", vplayout(1,1))
-  forest.plot.fn("tmax", "test", vplayout(2,1))
-
-  dev.off()
-
-  violin.plot.fn("auc", "test", F, F)
-  violin.plot.fn("cmax", "test", F, F)
-  violin.plot.fn("tmax", "test", F, F)
+  p3 <- ggplot(plottmax, aes(x = typef, y = prop))
+  p3 <- p3 + geom_hline(yintercept = 1, color = "green4", linetype = "dashed")
+  p3 <- p3 + geom_boxplot()
+  p3 <- p3 + ggtitle("Broad Study Tmax")
+  p3 <- p3 + xlab("\nMethod")
+  p3 <- p3 + ylab("Method/Reference Ratio\n")
+  p3 <- p3 + facet_wrap(~data, nrow = 1)
+  p3

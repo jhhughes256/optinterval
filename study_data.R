@@ -24,7 +24,7 @@
   pred.d2b <- function(x, p) {
     exp(p[1]*x + p[3]) + exp(p[2]*x + p[4])
   }
-  d2b.p <- c(-0.5, -0.05, 6, 5)
+  d2b.p <- c(-0.06, -0.5, 5, 6)
   d2b <- data.frame(
     time = time.samp,
     conc = pred.d2b(time.samp, d2b.p)
@@ -35,7 +35,7 @@
   pred.d3b <- function(x, p) {
     exp(p[1]*x + p[4]) + exp(p[2]*x + p[5]) + exp(p[3]*x + p[6])
   }
-  d3b.p <- c(-0.4, -0.01, -0.1, 6, 4.1, 4.7)
+  d3b.p <- c(-0.03, -0.15, -0.5, 3.8, 4.7, 6)
   d3b <- data.frame(
     time = time.samp,
     conc = pred.d3b(time.samp, d3b.p)
@@ -57,18 +57,18 @@
   pred.d2a <- function(x, p) {
     exp(p[1]*x + p[4]) + exp(p[2]*x + p[5]) - exp(p[3]*x + log(sum(exp(p[4]), exp(p[5]))))
   }
-  d2a.p <- c(-0.2, -0.01, -0.4, log(exp(4)*0.8), log(exp(4)*0.2))
+  d2a.p <- c(-0.06, -0.4, -0.6, log(exp(4)*0.15), log(exp(4)*0.85))
   d2a <- data.frame(
     time = time.samp,
     conc = pred.d2a(time.samp, d2a.p)
   )
-  #with(d2a, plot(time, log(conc)))
+  # with(d2a, plot(time, log(conc)))
   d2a.t <- c(0, 0.5, 1, 3, 5, 8, 12, 16, 24)
 # Three Compartment Kinetics w/ Absorption
   pred.d3a <- function(x, p) {
     exp(p[1]*x + p[5]) + exp(p[2]*x + p[6]) + exp(p[3]*x + p[7]) - exp(p[4]*x + log(sum(exp(p[5]), exp(p[6]), exp(p[7]))))
   }
-  d3a.p <- c(-0.5, -0.08, -0.001, -0.8, log(exp(4)*0.6), log(exp(4)*0.25), log(exp(4)*0.15))
+  d3a.p <- c(-0.05, -0.25, -0.6, -1, log(exp(4)*0.10), log(exp(4)*0.35), log(exp(4)*0.55))
   d3a <- data.frame(
     time = time.samp,
     conc = pred.d3a(time.samp, d3a.p)

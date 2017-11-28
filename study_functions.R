@@ -108,7 +108,15 @@
     opt.mes <- list(NULL)
     opt.hes <- list(NULL)
     lm.sub <- which(y == max(y))[1]:length(y)
-    lmres <- unname(lm(log(y[lm.sub]) ~ x[lm.sub])$coefficients)
+    repeat {
+      lmres <- unname(lm(log(y[lm.sub]) ~ x[lm.sub])$coefficients)
+      if (is.na(lmres[2])) {
+        lmres <- c(max(y), -0.00001)
+        break
+      }
+      if (lmres[2] < 0) break
+      else lm.sub <- lm.sub[-1]
+    }
     for (i in 1:nexp) {
       if (i == 1 & !oral) {
         optres <- list(
@@ -117,10 +125,7 @@
           counts = NULL, convergence = 0, message = NULL
         )
       } else {
-        if (is.na(lmres[2])) {
-          lmres <- c(max(y), -0.00001)
-        }
-        gares <- ga("real-valued",
+        gares <- try(ga("real-valued",
           mle.sumexp, x = x, y = y, ga = T, sigma = 0.01,
           min = c(rep(lmres[2]*50, i + oral), rep(lmres[1]-2, i)),
           max = c(rep(lmres[2]/50, i + oral), rep(lmres[1]+2, i)),
@@ -130,7 +135,7 @@
           maxiter = 50,
           popSize = 250,
           monitor = F
-        )
+        ))
         optres <- try(optim(
           gares@solution[1, ],
           mle.sumexp,
@@ -138,12 +143,17 @@
           x = x, y = y, sigma = 0.01
         ))
         if (class(optres) == "try-error") {
-          try(optim(
-            gares@solution[1, ],
-            mle.sumexp,
-            method = "Nelder-Mead", hessian = T,
-            x = x, y = y, sigma = 0.01
-          ))
+          optres <- list(
+            par = gares@solution[1,],
+            value = mle.sumexp(gares@solution[1,], x, y, 0.01),
+            counts = c("function" = 501, gradient = NA),
+            convergence = 99,
+            message = "zero gradient",
+            hessian = matrix(NA,
+              ncol = length(gares@solution[1,]),
+              nrow = length(gares@solution[1,])
+            )
+          )
         }
       }
       slope.par <- optres$par[1:(i+oral)]
@@ -330,7 +340,8 @@
       secd <- pred.sumexp(exp.par, times[-length(times)], 2)
     }
     err <- deltat^3*secd/12
-    return(sum(err^2))
+    sumerr <- sqrt(mean(err^2))
+    return(sumerr)
   }
 
 # Interval optimising function
@@ -371,19 +382,30 @@
     return(res)
   }
 
-  optim.interv.dtmax <- function(fit.par, times, tmax = NULL) {
+  optim.interv.dtmax <- function(fit.par, times, tmax = FALSE) {
     tfirst <- min(times)
     tlast <- max(times)
-    npar <- length(times) - 2
+    npar <- length(times) - (2 + tmax)
     absorp <- ifelse((length(fit.par) %% 2) != 0, T, F)
     init.par <- cumsum(rep(tlast/48, npar))
-    res <- optim(
+    if (tmax) tmax.val <- tmax.sumexp(fit.par, tlast)
+    else tmax.val <- NULL
+    res <- try(optim(
       init.par,
       err.interv.dtmax,
       method = "L-BFGS-B", hessian = T,
-      lower = tlast/48, upper = tlast - npar*tlast/48,
-      exp.par = fit.par, tfirst = tfirst, tlast = tlast, a = absorp, tmax = tmax
-    )
+      lower = tlast/48, upper = tlast/2, exp.par = fit.par,
+      tfirst = tfirst, tlast = tlast, a = absorp, tmax = tmax.val
+    ))
+    if (class(res) == "try-error") {
+      res <- try(optim(
+        init.par,
+        err.interv.dtmax,
+        method = "L-BFGS-B", hessian = T,
+        lower = tlast/48, upper = tlast/(npar/2), exp.par = fit.par,
+        tfirst = tfirst, tlast = tlast, a = absorp, tmax = tmax.val
+      ))
+    }
     res$times <- sort(c(cumsum(res$par), tmax))
     return(res)
   }
@@ -508,11 +530,23 @@
     return(sum(auc))
   }
 
+  auc.interv.sumexp <- function(times, fit.par, log = F) {
+    C <- pred.sumexp(fit.par, times)
+    auc <- c(NULL)
+    for (i in 2:length(C)) {
+      h <- times[i] - times[i-1]
+      dC <- C[i-1] - C[i]
+      if (log & dC > 0) auc[i-1] <- dC*h/log(C[i-1]/C[i])
+      else auc[i-1] <- (C[i-1] + C[i])*h/2
+    }
+    return(sum(auc))
+  }
+
 # Without for loop
 #  auc.interv <- function(times, fit.par, fn, log = F) {
 #    C <- do.call(fn, list(x = times, p = fit.par))
 #    h <- diff(times)
-#    EC <- psum(C[-1], C[-length(C)])
+#    EC <- sum(C[-1], C[-length(C)])
 #    dC <- diff(-C)
 #    if (!log) auc <- EC*h/2
 #    else auc[i-1] <- dC*h/log(C[i-1]/C[i])
