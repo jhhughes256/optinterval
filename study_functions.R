@@ -385,16 +385,17 @@
   optim.interv.dtmax <- function(fit.par, times, tmax = FALSE) {
     tfirst <- min(times)
     tlast <- max(times)
-    npar <- length(times) - (2 + tmax)
+    tbound <- tlast - tfirst
     absorp <- ifelse((length(fit.par) %% 2) != 0, T, F)
-    init.par <- cumsum(rep(tlast/48, npar))
-    if (tmax) tmax.val <- tmax.sumexp(fit.par, tlast)
+    npar <- length(times) - (2 + tmax*absorp)
+    init.par <- cumsum(rep(tbound/48, npar))
+    if (tmax & absorp) tmax.val <- tmax.sumexp(fit.par, tlast)
     else tmax.val <- NULL
     res <- try(optim(
       init.par,
       err.interv.dtmax,
       method = "L-BFGS-B", hessian = T,
-      lower = tlast/48, upper = tlast/2, exp.par = fit.par,
+      lower = tbound/48, upper = tbound/2, exp.par = fit.par,
       tfirst = tfirst, tlast = tlast, a = absorp, tmax = tmax.val
     ))
     if (class(res) == "try-error") {
@@ -402,11 +403,11 @@
         init.par,
         err.interv.dtmax,
         method = "L-BFGS-B", hessian = T,
-        lower = tlast/48, upper = tlast/(npar/2), exp.par = fit.par,
+        lower = tbound/48, upper = tbound/(npar/2), exp.par = fit.par,
         tfirst = tfirst, tlast = tlast, a = absorp, tmax = tmax.val
       ))
     }
-    res$times <- sort(c(cumsum(res$par), tmax))
+    res$times <- sort(c(cumsum(c(tfirst, res$par)), tmax.val, tlast))
     return(res)
   }
 
@@ -506,6 +507,33 @@
       flag <- flag + 1
     }
     return(res)
+  }
+  
+  pred.tlast <- function(fit.par, tlast) {
+    i <- round(tlast/12, 0)
+    perc.term <- 1
+    timeloop <- seq(0, i*12, by = i*12/120)
+    predloop <- pred.sumexp(fit.par, timeloop)
+    tmax <- timeloop[which(predloop == max(predloop))]
+    while(perc.term > 0.2) {
+      if (exists("init")) {
+        repeat {
+          i <- i + 1
+          timesloop <- seq(0, i*12, by = i*12/120)
+          predloop <- pred.sumexp(fit.par, timesloop)
+          clast <- tail(predloop, 1)
+          if (clast < cterm) break
+        }
+      }
+      clast <- tail(predloop, 1)
+      auclast <- auc.interv.sumexp(timeloop, fit.par, log = T)
+      lambz <- max(head(fit.par, ceiling(length(fit.par)/2)))
+      aucinf <- clast/-lambz
+      perc.term <- aucinf/(auclast+aucinf)
+      cterm <- clast*(0.18/perc.term)
+      init <- 1
+    }
+    return(c(i*12, 1-perc.term))
   }
 
 

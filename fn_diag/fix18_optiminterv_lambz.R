@@ -4,7 +4,8 @@
 #  would be placed between the penultimate and last parameters.
 #   + placed in the dead centre
 #   + placed in the log centre
-#   + optimised between the two existing points
+#   + placed so that the AUC is optimised between the 3 points
+#   + placed so that the lambdaz is optimised between the 3 points
 # - fix the two points like with tmax, optimised so that when combined with tlast
 #   they provide an accurate lambdaz (might just trend to lower boundary....)
 # -----------------------------------------------------------------------------
@@ -12,11 +13,11 @@
   if (!exists("git.dir")) {
     rm(list = ls(all = T))
     wd <- c("C:/Users/Jim Hughes/Documents", "C:/Users/hugjh001/Documents",
-      "C:/Users/hugjh001/Desktop", "C:/windows/system32")
+      "C:/Users/hugjh001/Desktop", "C:/windows/system32", "C:/Users/Jim Hughes/Documents/GitRepos/optinterval")
 
     graphics.off()
-    if (getwd() == wd[1]) {
-      gir.dir <- paste0(getwd(), "/GitRepos")
+    if (getwd() == wd[1] | getwd() == wd[5]) {
+      git.dir <- "C:/Users/Jim Hughes/Documents/GitRepos"
       reponame <- "optinterval"
     } else if (getwd() == wd[2]) {
       git.dir <- getwd()
@@ -138,6 +139,76 @@
   p4 <- p4 + scale_y_log10(lim = c(0.1, 20))
   p4
 
-# optimised
+# optimised AUC
   tail.par <- c(tail(topt, 2)[1], mean(tail(topt, 2)), tail(topt, 1))
-  optim.interv.dtmax(fit.par, tail.par)
+  t5 <- c(head(topt), optim.interv.dtmax(fit.par, tail.par)$times)
+  
+  predata <- data.frame(
+    times = t5,
+    dv = pred.sumexp(fit.par, t5)
+  )
+  lmres5 <- lm(log(dv) ~ times, tail(predata, 3))
+  lmresc5 <- unname(lmres5$coefficients)
+  lmrest5 <- seq(round(tail(predata, 3)$times[1], 0), 48, by = 0.1)
+  lmdata5 <- data.frame(
+    times = lmrest5,
+    dv = exp(predict(lmres5, data.frame(times = lmrest5)))
+  )
+  auc5 <- auc.interv.sumexp(t5, fit.par, log = T) + with(predata, tail(dv, 1))/-lmresc5[2]
+  prop5 <- auc5/trueauc
+  
+  p5 <- NULL
+  p5 <- ggplot()
+  p5 <- p5 + geom_line(aes(x = times, y = dv),
+                       data = obsdata, size = 0.8, colour = "blue")
+  p5 <- p5 + geom_point(aes(x = times, y = dv),
+                        data = predata, size = 1.5, colour = "red")
+  p5 <- p5 + geom_line(aes(x = times, y = dv),
+                       data = lmdata5, size = 0.8, colour = "green4", linetype = "dashed")
+  p5 <- p5 + scale_y_log10(lim = c(0.1, 20))
+  p5
+  
+# optimised lambdaz
+  topt.lamb <- optim(
+    tail.par[2],
+    function(p, tfirst, tlast, fit) {
+      m <- fit[1:ceiling(length(fit)/2)]
+      times <- c(tfirst, p, tlast)
+      pred <- data.frame(
+        time = times,
+        dv = pred.sumexp(fit.par, times)
+      )
+      lmres <- lm(log(dv) ~ times, pred)$coefficients
+      err <- sqrt(diff(c(max(m), lmres[2]))^2)
+      return(err)
+    }, 
+    method = "L-BFGS-B", hessian = T,
+    lower = tail.par[1], upper = tail.par[3],
+    tfirst = tail.par[1], tlast = tail.par, fit = fit.par
+  )$par
+  t6 <- c(head(topt), tail.par[1], topt.lamb, tail.par[3])
+  
+  predata <- data.frame(
+    times = t6,
+    dv = pred.sumexp(fit.par, t6)
+  )
+  lmres6 <- lm(log(dv) ~ times, tail(predata, 3))
+  lmresc6 <- unname(lmres6$coefficients)
+  lmrest6 <- seq(round(tail(predata, 3)$times[1], 0), 48, by = 0.1)
+  lmdata6 <- data.frame(
+    times = lmrest6,
+    dv = exp(predict(lmres6, data.frame(times = lmrest6)))
+  )
+  auc6 <- auc.interv.sumexp(t6, fit.par, log = T) + with(predata, tail(dv, 1))/-lmresc6[2]
+  prop6 <- auc6/trueauc
+  
+  p6 <- NULL
+  p6 <- ggplot()
+  p6 <- p6 + geom_line(aes(x = times, y = dv),
+                       data = obsdata, size = 0.8, colour = "blue")
+  p6 <- p6 + geom_point(aes(x = times, y = dv),
+                        data = predata, size = 1.5, colour = "red")
+  p6 <- p6 + geom_line(aes(x = times, y = dv),
+                       data = lmdata6, size = 0.8, colour = "green4", linetype = "dashed")
+  p6 <- p6 + scale_y_log10(lim = c(0.1, 20))
+  p6

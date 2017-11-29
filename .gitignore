@@ -1,3 +1,4 @@
 plot/
 *.rds
 .Rproj.user
+.Rhistory
