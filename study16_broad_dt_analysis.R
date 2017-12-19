@@ -226,16 +226,26 @@
   write.csv(broad.out, "broad-output.csv")
 
 # Plot
-  plotdata <- plotdata[plotdata$type != "optc", ]
-  plotdata$typef <- as.factor(plotdata$type)
-  levels(plotdata$typef) <- c("Basic", "Optint", "Optint w/ Cmax")
-  plotauc <- plotdata[plotdata$metric == "auc", ]
-  plotcmax <- plotdata[plotdata$metric == "cmax" & plotdata$data %in% c("d1a", "d2a", "d3a"), ]
-  plottmax <- plotdata[plotdata$metric == "tmax" & plotdata$data %in% c("d1a", "d2a", "d3a"), ]
+  subdata <- plotdata[plotdata$type != "optc", ]
+  subdata$typef <- as.factor(subdata$type)
+  levels(subdata$typef) <- c("Basic", "Optint", "Optint w/ Cmax")
+  subdata <- ddply(subdata, .(data, typef, metric), function(x) {
+    data.frame(
+      prop = x$prop,
+      CI90lo = quantile(x$prop, probs = 0.05, na.rm = T, names = F),
+      CI90hi = quantile(x$prop, probs = 0.95, na.rm = T, names = F),
+      CI95lo = quantile(x$prop, probs = 0.025, na.rm = T, names = F),
+      CI95hi = quantile(x$prop, probs = 0.975, na.rm = T, names = F)
+    )
+  })
+  plotauc <- subdata[subdata$metric == "auc", ]
+  plotcmax <- subdata[subdata$metric == "cmax" & subdata$data %in% c("d1a", "d2a", "d3a"), ]
+  plottmax <- subdata[subdata$metric == "tmax" & subdata$data %in% c("d1a", "d2a", "d3a"), ]
 
   p1 <- ggplot(plotauc, aes(x = typef, y = prop))
   p1 <- p1 + geom_hline(yintercept = 1, color = "green4", linetype = "dashed")
-  p1 <- p1 + geom_boxplot()
+  # p1 <- p1 + geom_boxplot(aes(ymin = CI90lo, ymax = CI90hi))
+  p1 <- p1 + geom_boxplot(aes(ymin = CI95lo, ymax = CI95hi))
   p1 <- p1 + ggtitle("Broad Study AUC")
   p1 <- p1 + xlab("\nMethod")
   p1 <- p1 + ylab("Method/Reference Ratio\n")
@@ -244,7 +254,8 @@
 
   p2 <- ggplot(plotcmax, aes(x = typef, y = prop))
   p2 <- p2 + geom_hline(yintercept = 1, color = "green4", linetype = "dashed")
-  p2 <- p2 + geom_boxplot()
+  # p2 <- p2 + geom_boxplot(aes(ymin = CI90lo, ymax = CI90hi))
+  p2 <- p2 + geom_boxplot(aes(ymin = CI95lo, ymax = CI95hi))
   p2 <- p2 + ggtitle("Broad Study Cmax")
   p2 <- p2 + xlab("\nMethod")
   p2 <- p2 + ylab("Method/Reference Ratio\n")
@@ -253,7 +264,8 @@
 
   p3 <- ggplot(plottmax, aes(x = typef, y = prop))
   p3 <- p3 + geom_hline(yintercept = 1, color = "green4", linetype = "dashed")
-  p3 <- p3 + geom_boxplot()
+  # p3 <- p3 + geom_boxplot(aes(ymin = CI90lo, ymax = CI90hi))
+  p3 <- p3 + geom_boxplot(aes(ymin = CI95lo, ymax = CI95hi))
   p3 <- p3 + ggtitle("Broad Study Tmax")
   p3 <- p3 + xlab("\nMethod")
   p3 <- p3 + ylab("Method/Reference Ratio\n")

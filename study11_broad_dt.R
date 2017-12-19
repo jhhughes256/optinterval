@@ -118,8 +118,8 @@
     print(paste0(i, "done"))
   }  # for loop
   setwd("E:/Hughes/Git/splines/fn_diag")
-  saveRDS(fin.res[[1]]$result, "d2b-narrow-dt05-RMSE.rds")
-  saveRDS(fin.res[[2]]$result, "d3b-narrow-dt05-RMSE.rds")
-  saveRDS(fin.res[[3]]$result, "d1a-narrow-dt05-RMSE.rds")
-  saveRDS(fin.res[[4]]$result, "d2a-narrow-dt05-RMSE.rds")
-  saveRDS(fin.res[[5]]$result, "d3a-narrow-dt05-RMSE.rds")
+  saveRDS(fin.res[[1]]$result, "d2b-broad-dt05-RMSE.rds")
+  saveRDS(fin.res[[2]]$result, "d3b-broad-dt05-RMSE.rds")
+  saveRDS(fin.res[[3]]$result, "d1a-broad-dt05-RMSE.rds")
+  saveRDS(fin.res[[4]]$result, "d2a-broad-dt05-RMSE.rds")
+  saveRDS(fin.res[[5]]$result, "d3a-broad-dt05-RMSE.rds")

@@ -30,7 +30,7 @@
   source(paste(git.dir, reponame, "sumstat_functions.R", sep = "/"))
 
 # Source files of interest
-  sumexp.string <- "d1a"
+  sumexp.string <- "d2a"
   ref.string <- "dt05"
   test.string <- "dt15"
   ref <- readRDS(paste(git.dir, reponame,
