@@ -29,7 +29,7 @@
 
 # Source scripts to set up environment
   set.seed(256256)
-  # niter <- 1000
+  niter <- 1000
   source(paste(git.dir, reponame, "study_functions.R", sep = "/"))
   source(paste(git.dir, reponame, "study_rdata.R", sep = "/"))
 
@@ -41,7 +41,7 @@
   fn.names <- paste("pred", data.names, sep = ".")
   t1.names <- paste(data.names, "t", sep = ".")
 
-  study.fn <- function(data, par, fn, nobs, t1, sdev = 0.15, tlast = 24, logauc = F) {
+  study.fn <- function(data, par, fn, nobs, t1, sdev = 0.05, tlast = 24, logauc = F) {
     niter <- dim(data)[2]
     absorp <- ifelse((dim(par)[1] %% 2) != 0, T, F)
     err <- matrix(
@@ -49,16 +49,13 @@
       nrow = length(t1), ncol = niter
     )
     subd <- data[which(time.samp %in% t1),]*err
-    res.sumexp <- apply(subd, 2, function(x) {
-      out <- optim.sumexp.hes(
+    all.sumexp <- apply(subd, 2, function(x) {
+      optim.sumexp.hes(
         data.frame(time = t1, conc = x), oral = absorp
       )
-      chisq.sumexp(out)
     })
-    fit.par <- lapply(res.sumexp, FUN = function(x) {
-      x$par
-    })
-
+    res.sumexp <- lapply(all.sumexp, chisq.sumexp.aic)
+    fit.par <- lapply(res.sumexp, function(x) x$par)
     true.tlast <- apply(par, 2, function(x) {
       list(seq(0, pred.tlast(x, 12)[1], length.out = length(t1)))
     })
@@ -68,6 +65,12 @@
     lam.tlast <- lapply(fit.par, function(x) {
       seq(0, pred.tlast.lam(x), length.out = length(t1))
     })
+  # Explanation of Option Naming
+  #         a b c
+  #       t 0 0 0
+  # a - fixed tmax (0 - off, 1 - on)
+  # b - variable tlast (0 - off, 1 - 80% auc, 2 - three half-lives)
+  # c - optimal lambdaz (0 - off, 1 - geomean, 2 - optimise)
 
     t000.res <- lapply(fit.par, FUN = function(x) {
       optim.interv.dtmax(x, t1)
@@ -114,8 +117,8 @@
       c(head(x, nobs-2), geomean, tail(x, 1))
     })
     t002 <- mapply(t001.res, fit.par, FUN = function(x, fit) {
-      tail.par <- tail(x, 2)
-      topt.lamb <- optim(
+      tail.par <- tail(unique(x), 2)
+      optres <- try(optim(
         mean(tail.par),
         function(p, tfirst, tlast, fit) {
           m <- fit[1:ceiling(length(fit)/2)]
@@ -131,8 +134,12 @@
         method = "L-BFGS-B", hessian = T,
         lower = tail.par[1], upper = tail.par[2],
         tfirst = tail.par[1], tlast = tail.par[2], fit = fit
-      )$par
-      c(head(x, nobs-2), topt.lamb, tail(x, 1))
+      ))
+      if (class(optres) == "try-error") {
+        sort(c(head(x, nobs-2), exp(mean(log(tail.par))), tail(x, 1)))
+      } else {
+        sort(c(head(x, nobs-2), optres$par, tail(x, 1)))
+      }
     })
     t010 <- sapply(t010.res, FUN = function(x) {
       x$times
@@ -142,8 +149,8 @@
       c(head(x, nobs-2), geomean, tail(x, 1))
     })
     t012 <- mapply(t011.res, fit.par, FUN = function(x, fit) {
-      tail.par <- tail(x, 2)
-      topt.lamb <- optim(
+      tail.par <- tail(unique(x), 2)
+      optres <- try(optim(
         mean(tail.par),
         function(p, tfirst, tlast, fit) {
           m <- fit[1:ceiling(length(fit)/2)]
@@ -159,8 +166,12 @@
         method = "L-BFGS-B", hessian = T,
         lower = tail.par[1], upper = tail.par[2],
         tfirst = tail.par[1], tlast = tail.par[2], fit = fit
-      )$par
-      c(head(x, nobs-2), topt.lamb, tail(x, 1))
+      ))
+      if (class(optres) == "try-error") {
+        sort(c(head(x, nobs-2), exp(mean(log(tail.par))), tail(x, 1)))
+      } else {
+        sort(c(head(x, nobs-2), optres$par, tail(x, 1)))
+      }
     })
     t020 <- sapply(t020.res, FUN = function(x) {
       x$times
@@ -170,8 +181,8 @@
       c(head(x, nobs-2), geomean, tail(x, 1))
     })
     t022 <- mapply(t021.res, fit.par, FUN = function(x, fit) {
-      tail.par <- tail(x, 2)
-      topt.lamb <- optim(
+      tail.par <- tail(unique(x), 2)
+      optres <- try(optim(
         mean(tail.par),
         function(p, tfirst, tlast, fit) {
           m <- fit[1:ceiling(length(fit)/2)]
@@ -187,8 +198,12 @@
         method = "L-BFGS-B", hessian = T,
         lower = tail.par[1], upper = tail.par[2],
         tfirst = tail.par[1], tlast = tail.par[2], fit = fit
-      )$par
-      c(head(x, nobs-2), topt.lamb, tail(x, 1))
+      ))
+      if (class(optres) == "try-error") {
+        sort(c(head(x, nobs-2), exp(mean(log(tail.par))), tail(x, 1)))
+      } else {
+        sort(c(head(x, nobs-2), optres$par, tail(x, 1)))
+      }
     })
     t100 <- sapply(t100.res, FUN = function(x) {
       x$times
@@ -198,8 +213,8 @@
       c(head(x, nobs-2), geomean, tail(x, 1))
     })
     t102 <- mapply(t101.res, fit.par, FUN = function(x, fit) {
-      tail.par <- tail(x, 2)
-      topt.lamb <- optim(
+      tail.par <- tail(unique(x), 2)
+      optres <- try(optim(
         mean(tail.par),
         function(p, tfirst, tlast, fit) {
           m <- fit[1:ceiling(length(fit)/2)]
@@ -215,8 +230,12 @@
         method = "L-BFGS-B", hessian = T,
         lower = tail.par[1], upper = tail.par[2],
         tfirst = tail.par[1], tlast = tail.par[2], fit = fit
-      )$par
-      c(head(x, nobs-2), topt.lamb, tail(x, 1))
+      ))
+      if (class(optres) == "try-error") {
+        sort(c(head(x, nobs-2), exp(mean(log(tail.par))), tail(x, 1)))
+      } else {
+        sort(c(head(x, nobs-2), optres$par, tail(x, 1)))
+      }
     })
     t110 <- sapply(t110.res, FUN = function(x) {
       x$times
@@ -226,8 +245,8 @@
       c(head(x, nobs-2), geomean, tail(x, 1))
     })
     t112 <- mapply(t111.res, fit.par, FUN = function(x, fit) {
-      tail.par <- tail(x, 2)
-      topt.lamb <- optim(
+      tail.par <- tail(unique(x), 2)
+      optres <- try(optim(
         mean(tail.par),
         function(p, tfirst, tlast, fit) {
           m <- fit[1:ceiling(length(fit)/2)]
@@ -243,8 +262,12 @@
         method = "L-BFGS-B", hessian = T,
         lower = tail.par[1], upper = tail.par[2],
         tfirst = tail.par[1], tlast = tail.par[2], fit = fit
-      )$par
-      c(head(x, nobs-2), topt.lamb, tail(x, 1))
+      ))
+      if (class(optres) == "try-error") {
+        sort(c(head(x, nobs-2), exp(mean(log(tail.par))), tail(x, 1)))
+      } else {
+        sort(c(head(x, nobs-2), optres$par, tail(x, 1)))
+      }
     })
     t120 <- sapply(t120.res, FUN = function(x) {
       x$times
@@ -254,8 +277,8 @@
       c(head(x, nobs-2), geomean, tail(x, 1))
     })
     t122 <- mapply(t121.res, fit.par, FUN = function(x, fit) {
-      tail.par <- tail(x, 2)
-      topt.lamb <- optim(
+      tail.par <- tail(unique(x), 2)
+      optres <- try(optim(
         mean(tail.par),
         function(p, tfirst, tlast, fit) {
           m <- fit[1:ceiling(length(fit)/2)]
@@ -271,8 +294,12 @@
         method = "L-BFGS-B", hessian = T,
         lower = tail.par[1], upper = tail.par[2],
         tfirst = tail.par[1], tlast = tail.par[2], fit = fit
-      )$par
-      c(head(x, nobs-2), topt.lamb, tail(x, 1))
+      ))
+      if (class(optres) == "try-error") {
+        sort(c(head(x, nobs-2), exp(mean(log(tail.par))), tail(x, 1)))
+      } else {
+        sort(c(head(x, nobs-2), optres$par, tail(x, 1)))
+      }
     })
 
     auc24 <- data.frame(
@@ -393,7 +420,7 @@
       )
     )
 
-    aucinf <- data.frame(
+    aucinf <- try(data.frame(
       true = apply(par, 2, function(x) {
         auc <- integrate(fn, 0, 168, p = x)$value
         inf <- fn(168, x)/abs(max(x[ceiling(length(x)/2)]))
@@ -494,7 +521,8 @@
         inf <- pred.lambdaz(x, t)
         auc + inf
       })
-    )
+    ))
+    if (class(aucinf) == "try-error") browser()
     test <- try(apply(par, 2, function(x) pred.sumexp(x, tmax.sumexp(x))))
     if (class(test) == "try-error") browser()
     cmax <- data.frame(
@@ -621,7 +649,7 @@
       auc = sapply(auc.tlast, function(x) tail(unlist(x), 1)),
       lam = sapply(lam.tlast, function(x) tail(unlist(x), 1))
     )
-    return(list(par = par, fit.par = fit.par, tlast = tlast, sumexp = res.sumexp,
+    return(list(par = par, fit.par = fit.par, tlast = tlast, sumexp = res.sumexp, tbas = t1,
       t000 = t000, t001 = t001, t002 = t002, t010 = t010, t011 = t011, t012 = t012,
       t020 = t020, t021 = t021, t022 = t022, t100 = t100, t101 = t101, t102 = t102,
       t110 = t110, t111 = t111, t112 = t112, t120 = t120, t121 = t121, t122 = t122,
@@ -634,7 +662,7 @@
   }
 
   fin.res <- list(NULL)
-  for (i in 1:5) {
+  for (i in 5) {
     fin.res[[i]] <- list(
       data = data.names[i],
       result = study.fn(get(data.names[i]),
@@ -645,8 +673,8 @@
     print(paste0(i, "done"))
   }  # for loop
   setwd("E:/Hughes/Git/splines/fn_diag")
-  saveRDS(fin.res[[1]]$result, "d2b-broad-tl15.rds")
-  saveRDS(fin.res[[2]]$result, "d3b-broad-tl15.rds")
-  saveRDS(fin.res[[3]]$result, "d1a-broad-tl15.rds")
-  saveRDS(fin.res[[4]]$result, "d2a-broad-tl15.rds")
-  saveRDS(fin.res[[5]]$result, "d3a-broad-tl15.rds")
+  saveRDS(fin.res[[1]]$result, "d2b-broad-AR3021.rds")
+  saveRDS(fin.res[[2]]$result, "d3b-broad-AR3021.rds")
+  saveRDS(fin.res[[3]]$result, "d1a-broad-AR3021.rds")
+  saveRDS(fin.res[[4]]$result, "d2a-broad-AR3021.rds")
+  saveRDS(fin.res[[5]]$result, "d3a-broad-AR3021.rds")

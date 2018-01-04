@@ -321,6 +321,118 @@ pred.sumexp <- function(par, x, d = 0) {
     res
   }
 
+  chisq.sumexp.err <- function(opt) {
+    values <- unlist(opt$value)
+    ofv <- values[which(names(values) == "ofv")]
+    k <- unlist(lapply(opt$par, length))
+    aic <- ofv + 2*k
+    return(sapply(opt, function(x) x[which(aic == min(aic))]))
+  }
+
+  mle.sumexp.err <- function(par, x, y, errmod, ga = F) {
+  # Determine log likelihood of given model parameters
+  # par = sum of exponential parameters
+  # x = independent variable (time)
+  # y = observed dependent variable (drug concentration)
+  # errmod = error model to be used c("add", "prop", "both")
+  # ga = genetic algorithm status
+    nerr <- ifelse(errmod == "both", 2, 1) # set number of error parameters
+    fit.par <- head(par, -nerr)  # define sum of exponentail parameters
+    err.par <- tail(par, nerr)  # define error paramters
+    z <- ifelse(ga, 2, -2)  # adjust ofv for minimisation or maximisation
+    yhat <- pred.sumexp(fit.par, x)  # sum of exponential model prediction
+  # Define standard deviation of normal distribution
+    if (errmod == "add") sd <- err.par
+    else if (errmod == "prop") sd <- abs(yhat)*err.par
+    else if (errmod == "both") {
+      add <- err.par[1]
+      prop <- abs(yhat)*err.par[2]
+      sd <- sqrt(add^2 + prop^2)
+    }
+    else stop("Please enter valid error model; \"add\", \"prop\" or \"both\"")
+  # Determine log likelihood
+    loglik <- suppressWarnings(dnorm(y, yhat, sd, log = T))
+    return(z*sum(loglik))
+  }
+
+  optim.sumexp.err <- function(data, oral = F, nexp = 3) {
+  # Determines best sum of exponential for given data
+  # data = mean pooled data;
+  #        first column independent variable;
+  #        second column dependent variable
+  # oral = whether the drug displays an absorption curve
+  # nexp = maximum fitted number of exponentials
+  # Prepare data (remove t == 0, remove negative concentrations)
+    x <- data[which(data[, 2] > 0 & data[, 1] != 0), 1]
+    y <- data[which(data[, 2] > 0 & data[, 1] != 0), 2]
+  # Set up objects
+    res <- list(par = NULL, sumexp = NULL, value = NULL,
+      error = NULL, hessian = NULL, message = NULL)
+    lm.sub <- which(y == max(y))[1]:length(y)
+    repeat {
+      lm.mod <- lm(log(y[lm.sub]) ~ x[lm.sub])
+      lmres <- unname(lm.mod$coefficients)
+      if (is.na(lmres[2])) {
+        lmres <- c(max(y), -0.00001)
+        break
+      }
+      if (lmres[2] < 0) {
+        lm.sd <- sd(residuals(lm.mod))
+        lm.add <- matrix(c(0, max(y)*lm.sd), nrow = 2)
+        lm.prop <- matrix(c(lm.sd/50, lm.sd*50), nrow = 2)
+        break
+      } else lm.sub <- tail(lm.sub, -1)
+    }
+    cand.mod <- expand.grid(1:nexp, c("add", "prop", "both"))  # candidate models
+    for (i in 1:nrow(cand.mod)) {
+      mod <- cand.mod[i, ]
+      if (mod[[2]] == "both") lm.err <- cbind(lm.add, lm.prop)
+      else lm.err <- get(paste0("lm.", mod[[2]]))
+      gares <- try(ga("real-valued",
+        mle.sumexp.err, x = x, y = y, ga = T, errmod = mod[[2]],
+        min = c(rep(lmres[2]*50, mod[[1]] + oral), rep(lmres[1]-2, mod[[1]]), lm.err[1,]),
+        max = c(rep(lmres[2]/50, mod[[1]] + oral), rep(lmres[1]+2, mod[[1]]), lm.err[2,]),
+        selection = gareal_lrSelection,
+        crossover = gareal_spCrossover,
+        mutation = gareal_raMutation,
+        maxiter = 50,
+        popSize = 250,
+        monitor = F
+      ))
+      optres <- try(optim(
+        gares@solution[1, ],
+        mle.sumexp.err,
+        method = "BFGS", hessian = T,
+        x = x, y = y, errmod = mod[[2]]
+      ))
+      if (class(optres) == "try-error") {
+        optres <- list(
+          par = gares@solution[1,],
+          value = mle.sumexp.err(gares@solution[1,], x, y),
+          counts = c("function" = 501, gradient = NA),
+          convergence = 99,
+          message = "zero gradient",
+          hessian = matrix(NA,
+            ncol = length(gares@solution[1,]),
+            nrow = length(gares@solution[1,])
+          )
+        )
+      }
+      fit.par <- head(optres$par, -ncol(lm.err))
+      err.par <- tail(optres$par, ncol(lm.err))
+      par.ord <- order.sumexp(fit.par, mod[[1]], oral)
+      res$par[[i]] <- optres$par
+      res$sumexp[[i]] <- par.ord
+      res$value[[i]] <- c(ofv = optres$value, optres$counts)
+      res$error[[i]] <- c(signif(err.par, 5), type = paste(mod[[2]]))
+      res$hessian[[i]] <- optres$hessian
+      res$message[[i]] <- c(convergence = optres$convergence,
+        message = ifelse(is.null(optres$message), "NULL", optres$message)
+      )
+    }
+    res
+  }
+
 # Chi-squared difference test
 # Takes a list of optim results and gives the best optim result
   chisq.sumexp <- function(opt) {
@@ -340,6 +452,13 @@ pred.sumexp <- function(par, x, d = 0) {
     x <- unlist(opt$value)
     k <- unlist(lapply(opt$par, length))
     aic <- x + 2*k
+    return(sapply(opt, function(x) x[which(aic == min(aic))]))
+  }
+
+  chisq.sumexp.bic <- function(opt, nobs) {
+    x <- unlist(opt$value)
+    k <- unlist(lapply(opt$par, length))
+    aic <- x + log(nobs)*k
     return(sapply(opt, function(x) x[which(aic == min(aic))]))
   }
 
@@ -615,7 +734,8 @@ pred.sumexp <- function(par, x, d = 0) {
   }
 
   pred.lambdaz <- function(par, t) {
-    dv <- pred.sumexp(par, t)
+    dv <- pred.sumexp(par, unique(t))
+    if (t[1] == 0) dv[1] <- 0
     mdv <- which(dv == 0)
     i <- 3
     bestR2 <- 0
@@ -623,9 +743,11 @@ pred.sumexp <- function(par, x, d = 0) {
     auc <- 0
     if (length(dv[-mdv]) >= i) {
       repeat {
-        mod <- lm(log(tail(dv[-mdv], i)) ~ tail(t[-mdv], i))
-        k <- -1*mod$coefficients["tail(t[-mdv], i)"]
+        mod <- suppressWarnings(lm(log(tail(dv[-mdv], i)) ~ tail(unique(t)[-mdv], i)))
+        k <- -1*mod$coefficients["tail(unique(t)[-mdv], i)"]
         R2 <- suppressWarnings(as.numeric(summary(mod)["adj.r.squared"]))
+        if (is.na(k)) browser()
+        if (is.nan(R2)) R2 <- suppressWarnings(as.numeric(summary(mod)["r.squared"]))
         if (k > 0) {
           if (R2 > bestR2) {
             bestR2 <- R2
@@ -641,48 +763,6 @@ pred.sumexp <- function(par, x, d = 0) {
     }
     auc
   }
-
-   #  ntail <- 3
-   # bestR2 <- 0
-   # bestk <- 0
-   # whichtime <- which(dv==max(dv)) #designate point of cmax
-   # adjdv <- dv[(whichtime-1):numobs] #delete all values before cmax as these are not needed for terminal phase, -1 to allow inclusion of Cmax in regression if required
-   # flag <- 0
-
-   # While number of values being used to determine the slope is less than the number of total values* do the following
-   #  - add one to ntail
-   #  - define tail values for dv and time
-   #  - fit line to log(dv) and time
-   #  - define k as the slope and the R2
-   #  - if R2 is better than the best R2 so far replace best R2 with new R2 and also replace best k with the new k
-   #subtraction of one as C0 may cause an error when logged
-   # if(length(adjdv)<ntail)
-   # {
-   #   AUCtinf <- 0
-   # }else{
-   #   while(ntail<(length(adjdv)) && flag!=1) {
-   #     dvtail   <- unlist(tail(adjdv,ntail))
-   #     timetail <- tail(time,ntail)
-   #     fittail  <- lm(log(dvtail) ~ timetail)
-   #
-   #     k  <- -1*fittail$coefficients["timetail"]
-   #     R2 <- as.numeric(summary(fittail)["r.squared"])
-   #     adjR2 <- 1-((1-R2)*(i-1)/(i-2)) #adjusted R2 as per WinNonLin user guide
-   #     if(adjR2>(bestR2-0.0001) && k>0) { #if statement as per WinNonLin user guide with added precautions against -ve k vals
-   #       bestR2 <- adjR2
-   #       bestk  <- k
-   #       ntail <- ntail+1
-   #     }else{
-   #       flag <- 1
-   #     }
-   #   }
-   #   if(bestk == 0) {
-   #     AUCtinf <- 0
-   #   }else{
- # Calculate AUC from final time to infinite and then add it to AUC from time zero to final time
-     #   Clast   <- tail(dv,1)
-     #   AUCtinf <- Clast/bestk
-     # }
 
 # -----------------------------------------------------------------------------
 # Determine tmax given a set of sumexp parameters

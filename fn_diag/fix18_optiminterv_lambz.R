@@ -54,7 +54,7 @@
   t0 <- c(t1[1:(nobs+1)], tlast)
 
 # Typical situation
-  t2 <- c(optim.interv.dtmax(fit.par, t0)$times, tlast)
+  t2 <- optim.interv.dtmax(fit.par, t0)$times
   predata <- data.frame(
     times = t2,
     dv = pred.sumexp(fit.par, t2)
@@ -83,7 +83,7 @@
 # New methods
   nobs <- 6
   t0 <- c(t1[1:(nobs+1)], tlast)
-  topt <- c(optim.interv.dtmax(fit.par, t0)$times, tlast)
+  topt <- optim.interv.dtmax(fit.par, t0)$times
 
 # Mean of final two
   t3 <- c(head(topt), tail(topt, 2)[1], mean(tail(topt, 2)), tail(topt, 1))
@@ -142,7 +142,7 @@
 # optimised AUC
   tail.par <- c(tail(topt, 2)[1], mean(tail(topt, 2)), tail(topt, 1))
   t5 <- c(head(topt), optim.interv.dtmax(fit.par, tail.par)$times)
-  
+
   predata <- data.frame(
     times = t5,
     dv = pred.sumexp(fit.par, t5)
@@ -156,7 +156,7 @@
   )
   auc5 <- auc.interv.sumexp(t5, fit.par, log = T) + with(predata, tail(dv, 1))/-lmresc5[2]
   prop5 <- auc5/trueauc
-  
+
   p5 <- NULL
   p5 <- ggplot()
   p5 <- p5 + geom_line(aes(x = times, y = dv),
@@ -167,7 +167,7 @@
                        data = lmdata5, size = 0.8, colour = "green4", linetype = "dashed")
   p5 <- p5 + scale_y_log10(lim = c(0.1, 20))
   p5
-  
+
 # optimised lambdaz
   topt.lamb <- optim(
     tail.par[2],
@@ -181,7 +181,7 @@
       lmres <- lm(log(dv) ~ times, pred)$coefficients
       err <- sqrt(diff(c(max(m), lmres[2]))^2)
       return(err)
-    }, 
+    },
     method = "L-BFGS-B", hessian = T,
     lower = tail.par[1], upper = tail.par[3],
     tfirst = tail.par[1], tlast = tail.par, fit = fit.par
@@ -201,7 +201,7 @@
   )
   auc6 <- auc.interv.sumexp(t6, fit.par, log = T) + with(predata, tail(dv, 1))/-lmresc6[2]
   prop6 <- auc6/trueauc
-  
+
   p6 <- NULL
   p6 <- ggplot()
   p6 <- p6 + geom_line(aes(x = times, y = dv),

@@ -36,6 +36,13 @@
     return(sapply(opt, function(x) x[which(aic == min(aic))]))
   }
 
+  chisq.sumexp.bic <- function(opt, nobs) {
+    x <- unlist(opt$value)
+    k <- unlist(lapply(opt$par, length))
+    aic <- x + log(nobs)*k
+    return(sapply(opt, function(x) x[which(aic == min(aic))]))
+  }
+
 # -----------------------------------------------------------------------------
 # Set up
   data <- d2b
@@ -49,28 +56,24 @@
     nrow = length(t1), ncol = niter
   )
   subd <- data[which(time.samp %in% t1),]*err
+  res.sumexp <- apply(subd, 2, function(x) {
+    optim.sumexp.hes(
+      data.frame(time = t1, conc = x), oral = absorp
+    )
+  })
   auc.tlast.true <- apply(par, 2, function(x) pred.tlast.lam(x))
 
 # Original
-  res.sumexp <- apply(subd, 2, function(x) {
-    out <- optim.sumexp.hes(
-      data.frame(time = t1, conc = x), oral = absorp
-    )
-    chisq.sumexp(out)
-  })
-  fit.par <- lapply(res.sumexp, FUN = function(x) {
-    x$par
-  })
-  auc.tlast.lrt <- lapply(fit.par, function(x) pred.tlast.lam(x))
+  lrt.sumexp <- lapply(res.sumexp, chisq.sumexp)
+  fit.par <- lapply(lrt.sumexp, function(x) x$par)
+  auc.tlast.lrt <- unlist(lapply(fit.par, function(x) pred.tlast.lam(x)))
 
 # AIC
-  res.sumexp <- apply(subd, 2, function(x) {
-    out <- optim.sumexp.hes(
-      data.frame(time = t1, conc = x), oral = absorp
-    )
-    chisq.sumexp.aic(out)
-  })
-  fit.par <- lapply(res.sumexp, FUN = function(x) {
-    x$par
-  })
-  auc.tlast.aic <- lapply(fit.par, function(x) pred.tlast.lam(x))
+  aic.sumexp <- lapply(res.sumexp, chisq.sumexp.aic)
+  fit.par <- lapply(aic.sumexp, function(x) x$par)
+  auc.tlast.aic <- unlist(lapply(fit.par, function(x) pred.tlast.lam(x)))
+
+# BIC
+  bic.sumexp <- lapply(res.sumexp, chisq.sumexp.bic, nobs = length(t1))
+  fit.par <- lapply(bic.sumexp, function(x) x$par)
+  auc.tlast.bic <- unlist(lapply(fit.par, function(x) pred.tlast.lam(x)))
