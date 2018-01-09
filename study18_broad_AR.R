@@ -29,7 +29,7 @@
 
 # Source scripts to set up environment
   set.seed(256256)
-  # niter <- 1000
+  niter <- 1000
   source(paste(git.dir, reponame, "study_functions.R", sep = "/"))
   source(paste(git.dir, reponame, "study_rdata.R", sep = "/"))
 
@@ -41,22 +41,40 @@
   fn.names <- paste("pred", data.names, sep = ".")
   t1.names <- paste(data.names, "t", sep = ".")
 
-  study.fn <- function(data, par, fn, nobs, t1, sdev = 0.15, tlast = 24, logauc = F) {
+  study.fn <- function(data, par, fn, nobs, t1, sdev = 4, tlast = 24, logauc = F) {  # sdev = 1:4
     niter <- dim(data)[2]
     absorp <- ifelse((dim(par)[1] %% 2) != 0, T, F)
     if (absorp) data[1, ] <- 0
-    err <- matrix(
-      1 + rnorm(n = length(t1)*niter, mean = 0, sd = sdev),
-      nrow = length(t1), ncol = niter
-    )
-    subd <- data[which(time.samp %in% t1),]*err
-    all.sumexp <- apply(subd, 2, function(x) {
-      optim.sumexp.hes(
+    subd <- data[which(time.samp %in% t1),]
+    if (sdev <= 2) {
+      if (sdev == 1) err.sig <- 0.05
+      if (sdev == 2) err.sig <- 0.15
+      eps1 <- matrix(
+        1 + rnorm(n = length(t1)*niter, mean = 0, sd = err.sig),
+        nrow = length(t1), ncol = niter
+      )
+      obs <- subd*eps1
+    } else {
+      if (sdev == 3) err.sig <- 0.05
+      if (sdev == 4) err.sig <- 0.1
+      eps1 <- matrix(
+        rnorm(n = length(t1)*niter, mean = 0, sd = err.sig),
+        nrow = length(t1), ncol = niter
+      )
+      eps2 <- apply(subd, 2, function(x) {
+        rnorm(n = length(t1), mean = 0, sd = tail(x, 1)*err.sig)
+      })
+      obs <- subd*(1 + eps1) + eps2
+    }
+    all.sumexp <- apply(obs, 2, function(x) {
+      # optim.sumexp.new(
+      optim.sumexp.sig(
         data.frame(time = t1, conc = x), oral = absorp
+        # , nexp = 2
       )
     })
-    res.sumexp <- lapply(all.sumexp, chisq.sumexp.aic)
-    fit.par <- lapply(res.sumexp, function(x) x$par)
+    res.sumexp <- lapply(all.sumexp, best.sumexp.aic)  # ".lrt)", ".aic)", ".bic, nobs = length(t1))"
+    fit.par <- lapply(res.sumexp, function(x) x$sumexp)
     true.tlast <- apply(par, 2, function(x) {
       list(seq(0, pred.tlast.lam(x), length.out = length(t1)))
     })
@@ -66,7 +84,7 @@
     lam.tlast <- lapply(fit.par, function(x) {
       seq(0, pred.tlast.lam(x), length.out = length(t1))
     })
-    obs.tlast.mat <- apply(subd, 2, function(x) {
+    obs.tlast.mat <- apply(obs, 2, function(x) {
       out <- try(seq(0, obs.tlast.lam(data.frame(t1, x)), length.out = length(t1)))
       if (class(out) == "try-error") browser()
       out
@@ -861,9 +879,15 @@
     )  # list
     print(paste0(i, "done"))
   }  # for loop
-  # setwd("E:/Hughes/Git/splines/fn_diag")
-  # saveRDS(fin.res[[1]]$result, "d2b-broad-AR2121.rds")
-  # saveRDS(fin.res[[2]]$result, "d3b-broad-AR2121.rds")
-  # saveRDS(fin.res[[3]]$result, "d1a-broad-AR2121.rds")
-  # saveRDS(fin.res[[4]]$result, "d2a-broad-AR2121.rds")
-  # saveRDS(fin.res[[5]]$result, "d3a-broad-AR2121.rds")
+  # Runs
+  # ARabcd
+  # a - max number of exponentials (2, 3)
+  # b - include sigma in mle (0 - off, 1 - on)
+  # c - ofv comparitive criterion (1 - lrt, 2 - aic, 3 - bic)
+  # d - error model (1 - loprop, 2- hiprop, 3 - loboth, 4- hiboth)
+  setwd("E:/Hughes/Git/splines/fn_diag")
+  saveRDS(fin.res[[1]]$result, "d2b-broad-AR3124.rds")
+  saveRDS(fin.res[[2]]$result, "d3b-broad-AR3124.rds")
+  saveRDS(fin.res[[3]]$result, "d1a-broad-AR3124.rds")
+  saveRDS(fin.res[[4]]$result, "d2a-broad-AR3124.rds")
+  saveRDS(fin.res[[5]]$result, "d3a-broad-AR3124.rds")

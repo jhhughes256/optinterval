@@ -9,6 +9,7 @@
 # -----------------------------------------------------------------------------
 # Sum of exponentials predicted concentrations function
   # pred.sumexp <- function(par, x, d = 0) {
+  # # There are currently issues with order.sumexp messing with optimisation if it is within pred.sumexp
   # # Provides predictions according to model parameters
   # # par = sum of exponential parameters
   # # x = independent variable (time)
@@ -32,8 +33,8 @@
   # par = sum of exponential parameters
   # n = number of exponentials
   # a = absorption status
-    m <- -abs(head(par, n))  # slope parameters (prevents exponential growth)
-    b <- tail(par, -(n))  # intercept parameters
+    m <- -abs(head(par, n+a))  # slope parameters (prevents exponential growth)
+    b <- tail(par, -(n+a))  # intercept parameters
     m.ord <- order(m, decreasing = T)  # slope order (terminal first, absorption last)
     b.ord <- m.ord  # intercept order (match slopes)
     if (a) b.ord <- order(m[-m.ord[n+a]], decreasing = T)  # if absorption curve remove extra term
@@ -54,30 +55,30 @@
 # }
 
 # Less Old function
-pred.sumexp <- function(par, x, d = 0) {
-# Provides predictions according to model parameters
-# par = sum of exponential parameters
-# x = independent variable (time)
-# d = order of derivative (uses dth derivative of model)
-# Define objects
-  l <- length(par)  # number of parameters
-  a <- l %% 2 == 1  # absorption status (odd parameter length == absorption)
-  n <- ceiling(l/2)  # number of exponentials
-  m <- -abs(par[1:n])  # slope parameters (prevents exponential growth)
-  b <- par[(n+1):l]  # intercept parameters
-# Order parameters (allows for flip-flop)
-  m.ord <- order(m, decreasing = T)  # slope order (terminal first, absorption last)
-  b.ord <- m.ord  # intercept order (match slopes)
-  if (a) b.ord <- order(m[-m.ord[n]], decreasing = T)  # if absorption curve remove extra term
-  p <- c(m[m.ord], b[b.ord])  # ordered parameters
-# Sum of exponentials
-  for (i in 1:n) {  # for each exponential
-    if (i == 1) yhat <- p[i]^d*exp(p[i]*x + p[n+i])  # first exponential defines yhat
-    else if (i != n | !a) yhat <- yhat + p[i]^d*exp(p[i]*x + p[n+i])  # following exponentials add to yhat
-    else if (a) yhat <- yhat - p[i]^d*exp(p[i]*x)*sum(exp(p[(n+1):(2*n-1)]))  # for absorption curve apply final term
+  pred.sumexp <- function(par, x, d = 0) {
+  # Provides predictions according to model parameters
+  # par = sum of exponential parameters
+  # x = independent variable (time)
+  # d = order of derivative (uses dth derivative of model)
+  # Define objects
+    l <- length(par)  # number of parameters
+    a <- l %% 2 == 1  # absorption status (odd parameter length == absorption)
+    n <- ceiling(l/2)  # number of exponentials
+    m <- -abs(par[1:n])  # slope parameters (prevents exponential growth)
+    b <- par[(n+1):l]  # intercept parameters
+  # Order parameters (allows for flip-flop)
+    m.ord <- order(m, decreasing = T)  # slope order (terminal first, absorption last)
+    b.ord <- m.ord  # intercept order (match slopes)
+    if (a) b.ord <- order(m[-m.ord[n]], decreasing = T)  # if absorption curve remove extra term
+    p <- c(m[m.ord], b[b.ord])  # ordered parameters
+  # Sum of exponentials
+    for (i in 1:n) {  # for each exponential
+      if (i == 1) yhat <- p[i]^d*exp(p[i]*x + p[n+i])  # first exponential defines yhat
+      else if (i != n | !a) yhat <- yhat + p[i]^d*exp(p[i]*x + p[n+i])  # following exponentials add to yhat
+      else if (a) yhat <- yhat - p[i]^d*exp(p[i]*x)*sum(exp(p[(n+1):(2*n-1)]))  # for absorption curve apply final term
+    }
+    return(yhat)  # predicted dependent variable (drug concentration)
   }
-  return(yhat)  # predicted dependent variable (drug concentration)
-}
 
 # Maximum likelihood estimation function for parameter optimisation
   mle.sumexp <- function(par, x, y, sigma, ga = F) {
@@ -321,12 +322,110 @@ pred.sumexp <- function(par, x, d = 0) {
     res
   }
 
-  chisq.sumexp.err <- function(opt) {
-    values <- unlist(opt$value)
-    ofv <- values[which(names(values) == "ofv")]
-    k <- unlist(lapply(opt$par, length))
-    aic <- ofv + 2*k
-    return(sapply(opt, function(x) x[which(aic == min(aic))]))
+  mle.sumexp.sig <- function(par, x, y, errmod, ga = F) {
+  # Determine log likelihood of given model parameters
+  # par = sum of exponential parameters
+  # x = independent variable (time)
+  # y = observed dependent variable (drug concentration)
+  # errmod = error model to be used c("add", "prop", "both")
+  # ga = genetic algorithm status
+    nerr <- ifelse(errmod == "both", 2, 1) # set number of error parameters
+    fit.par <- head(par, -nerr)  # define sum of exponentail parameters
+    err.par <- tail(par, nerr)  # define error paramters
+    z <- ifelse(ga, 2, -2)  # adjust ofv for minimisation or maximisation
+    yhat <- pred.sumexp(fit.par, x)  # sum of exponential model prediction
+  # Define standard deviation of normal distribution
+    if (errmod == "add") sd <- err.par
+    else if (errmod == "prop") sd <- abs(yhat)*err.par
+    else if (errmod == "both") {
+      add <- err.par[1]
+      prop <- abs(yhat)*err.par[2]
+      sd <- sqrt(add^2 + prop^2)
+    }
+    else stop("Please enter valid error model; \"add\", \"prop\" or \"both\"")
+  # Determine log likelihood
+    loglik <- suppressWarnings(dnorm(y, yhat, sd, log = T))
+    return(z*sum(loglik))
+  }
+
+  optim.sumexp.sig <- function(data, oral = F, nexp = 3) {
+  # Determines best sum of exponential for given data
+  # data = mean pooled data;
+  #        first column independent variable;
+  #        second column dependent variable
+  # oral = whether the drug displays an absorption curve
+  # nexp = maximum fitted number of exponentials
+  # Prepare data (remove t == 0, remove negative concentrations)
+    x <- data[which(data[, 2] > 0 & data[, 1] != 0), 1]
+    y <- data[which(data[, 2] > 0 & data[, 1] != 0), 2]
+  # Set up objects
+    res <- list(par = NULL, sumexp = NULL, value = NULL,
+      error = NULL, hessian = NULL, message = NULL)
+    lm.sub <- which(y == max(y))[1]:length(y)
+    repeat {
+      lm.mod <- lm(log(y[lm.sub]) ~ x[lm.sub])
+      lmres <- unname(lm.mod$coefficients)
+      if (is.na(lmres[2])) {
+        lmres <- c(max(y), -0.00001)
+        break
+      }
+      if (lmres[2] < 0) break
+      else lm.sub <- tail(lm.sub, -1)
+    }
+  # Estimate candidate model parameters
+    lm.sd <- sd(residuals(lm.mod))
+    lm.add <- matrix(c(0, max(y)*lm.sd), nrow = 2)
+    lm.prop <- matrix(c(lm.sd/50, lm.sd*50), nrow = 2)
+    cand.mod <- expand.grid(1:nexp, c("add", "prop", "both"))  # candidate models
+    for (i in 1:nrow(cand.mod)) {
+      mod <- cand.mod[i, ]
+      if (mod[[2]] == "both") lm.err <- cbind(lm.add, lm.prop)
+      else lm.err <- get(paste0("lm.", mod[[2]]))
+      gares <- try(ga("real-valued",
+        mle.sumexp.sig, x = x, y = y, ga = T, errmod = mod[[2]],
+        min = c(rep(lmres[2]*50, mod[[1]] + oral), rep(lmres[1]-2, mod[[1]]), lm.err[1,]),
+        max = c(rep(lmres[2]/50, mod[[1]] + oral), rep(lmres[1]+2, mod[[1]]), lm.err[2,]),
+        selection = gareal_lrSelection,
+        crossover = gareal_spCrossover,
+        mutation = gareal_raMutation,
+        maxiter = 50,
+        popSize = 250,
+        monitor = F
+      ))
+      if (class(gares) == "try-error") browser()
+      optres <- try(optim(
+        gares@solution[1, ],
+        mle.sumexp.sig,
+        method = "BFGS", hessian = T,
+        x = x, y = y, errmod = mod[[2]]
+      ))
+      if (class(optres) == "try-error") {
+        optres <- list(
+          par = gares@solution[1,],
+          value = mle.sumexp.sig(gares@solution[1,], x, y, errmod = mod[[2]]),
+          counts = c("function" = 501, gradient = NA),
+          convergence = 99,
+          message = "zero gradient",
+          hessian = matrix(NA,
+            ncol = length(gares@solution[1,]),
+            nrow = length(gares@solution[1,])
+          )
+        )
+      }
+    # Create output
+      fit.par <- head(optres$par, -ncol(lm.err))
+      err.par <- tail(optres$par, ncol(lm.err))
+      par.ord <- order.sumexp(fit.par, mod[[1]], oral)
+      res$par[[i]] <- optres$par
+      res$sumexp[[i]] <- par.ord
+      res$value[[i]] <- c(ofv = optres$value, optres$counts)
+      res$error[[i]] <- c(signif(err.par, 5), type = paste(mod[[2]]))
+      res$hessian[[i]] <- optres$hessian
+      res$message[[i]] <- c(convergence = optres$convergence,
+        message = ifelse(is.null(optres$message), "NULL", optres$message)
+      )
+    }
+    res
   }
 
   mle.sumexp.err <- function(par, x, y, errmod, ga = F) {
@@ -355,7 +454,7 @@ pred.sumexp <- function(par, x, d = 0) {
     return(z*sum(loglik))
   }
 
-  optim.sumexp.err <- function(data, oral = F, nexp = 3) {
+  optim.sumexp.new <- function(data, oral = F, nexp = 3) {
   # Determines best sum of exponential for given data
   # data = mean pooled data;
   #        first column independent variable;
@@ -367,7 +466,13 @@ pred.sumexp <- function(par, x, d = 0) {
     y <- data[which(data[, 2] > 0 & data[, 1] != 0), 2]
   # Set up objects
     res <- list(par = NULL, sumexp = NULL, value = NULL,
-      error = NULL, hessian = NULL, message = NULL)
+    error = NULL, hessian = NULL, message = NULL)
+    # opt.par <- list(NULL)
+    # opt.val <- list(NULL)
+    # opt.gra <- list(NULL)
+    # opt.con <- list(NULL)
+    # opt.mes <- list(NULL)
+    # opt.hes <- list(NULL)
     lm.sub <- which(y == max(y))[1]:length(y)
     repeat {
       lm.mod <- lm(log(y[lm.sub]) ~ x[lm.sub])
@@ -376,22 +481,15 @@ pred.sumexp <- function(par, x, d = 0) {
         lmres <- c(max(y), -0.00001)
         break
       }
-      if (lmres[2] < 0) {
-        lm.sd <- sd(residuals(lm.mod))
-        lm.add <- matrix(c(0, max(y)*lm.sd), nrow = 2)
-        lm.prop <- matrix(c(lm.sd/50, lm.sd*50), nrow = 2)
-        break
-      } else lm.sub <- tail(lm.sub, -1)
+      if (lmres[2] < 0) break
+      else lm.sub <- tail(lm.sub, -1)
     }
-    cand.mod <- expand.grid(1:nexp, c("add", "prop", "both"))  # candidate models
-    for (i in 1:nrow(cand.mod)) {
-      mod <- cand.mod[i, ]
-      if (mod[[2]] == "both") lm.err <- cbind(lm.add, lm.prop)
-      else lm.err <- get(paste0("lm.", mod[[2]]))
+  # Estimate candidate model parameters
+    for (i in 1:nexp) {
       gares <- try(ga("real-valued",
-        mle.sumexp.err, x = x, y = y, ga = T, errmod = mod[[2]],
-        min = c(rep(lmres[2]*50, mod[[1]] + oral), rep(lmres[1]-2, mod[[1]]), lm.err[1,]),
-        max = c(rep(lmres[2]/50, mod[[1]] + oral), rep(lmres[1]+2, mod[[1]]), lm.err[2,]),
+        mle.sumexp, x = x, y = y, ga = T, sigma = 0.01,
+        min = c(rep(lmres[2]*50, i + oral), rep(lmres[1]-2, i)),
+        max = c(rep(lmres[2]/50, i + oral), rep(lmres[1]+2, i)),
         selection = gareal_lrSelection,
         crossover = gareal_spCrossover,
         mutation = gareal_raMutation,
@@ -399,16 +497,17 @@ pred.sumexp <- function(par, x, d = 0) {
         popSize = 250,
         monitor = F
       ))
+      if (class(gares) == "try-error") browser()
       optres <- try(optim(
         gares@solution[1, ],
-        mle.sumexp.err,
+        mle.sumexp,
         method = "BFGS", hessian = T,
-        x = x, y = y, errmod = mod[[2]]
+        x = x, y = y, sigma = 0.01
       ))
       if (class(optres) == "try-error") {
         optres <- list(
           par = gares@solution[1,],
-          value = mle.sumexp.err(gares@solution[1,], x, y),
+          value = mle.sumexp(gares@solution[1,], x, y, 0.01),
           counts = c("function" = 501, gradient = NA),
           convergence = 99,
           message = "zero gradient",
@@ -418,13 +517,12 @@ pred.sumexp <- function(par, x, d = 0) {
           )
         )
       }
-      fit.par <- head(optres$par, -ncol(lm.err))
-      err.par <- tail(optres$par, ncol(lm.err))
-      par.ord <- order.sumexp(fit.par, mod[[1]], oral)
+    # Create output
+      par.ord <- order.sumexp(optres$par, i, oral)
       res$par[[i]] <- optres$par
       res$sumexp[[i]] <- par.ord
       res$value[[i]] <- c(ofv = optres$value, optres$counts)
-      res$error[[i]] <- c(signif(err.par, 5), type = paste(mod[[2]]))
+      res$error[[i]] <- c(0.01, "fixed")
       res$hessian[[i]] <- optres$hessian
       res$message[[i]] <- c(convergence = optres$convergence,
         message = ifelse(is.null(optres$message), "NULL", optres$message)
@@ -458,8 +556,39 @@ pred.sumexp <- function(par, x, d = 0) {
   chisq.sumexp.bic <- function(opt, nobs) {
     x <- unlist(opt$value)
     k <- unlist(lapply(opt$par, length))
-    aic <- x + log(nobs)*k
+    bic <- x + log(nobs)*k
+    return(sapply(opt, function(x) x[which(bic == min(bic))]))
+  }
+
+  best.sumexp.lrt <- function(opt) {
+    values <- unlist(opt$value)
+    ofv <- values[which(names(values) == "ofv")]
+    i <- 1
+    for (j in 2:length(opt$par)) {
+      degf <- length(opt$par[[j]]) - length(opt$par[[i]])
+      x <- ofv[i] - ofv[j]
+      p <- pchisq(x, degf, lower.tail = F)
+      if (p < 0.01) {
+        i <- i + 1
+      }
+    }
+    return(sapply(opt, function(x) x[i]))
+  }
+
+  best.sumexp.aic <- function(opt) {
+    values <- unlist(opt$value)
+    ofv <- values[which(names(values) == "ofv")]
+    k <- unlist(lapply(opt$par, length))
+    aic <- ofv + 2*k
     return(sapply(opt, function(x) x[which(aic == min(aic))]))
+  }
+
+  best.sumexp.bic <- function(opt, nobs) {
+    values <- unlist(opt$value)
+    ofv <- values[which(names(values) == "ofv")]
+    k <- unlist(lapply(opt$par, length))
+    bic <- ofv + log(nobs)*k
+    return(sapply(opt, function(x) x[which(bic == min(bic))]))
   }
 
 # Trapezoidal error function for interval optimisation
@@ -733,14 +862,18 @@ pred.sumexp <- function(par, x, d = 0) {
     ceiling(hl/4)*12
   }
 
-  pred.lambdaz <- function(par, t) {
-    dv <- pred.sumexp(par, unique(t))
+  obs.tlast.lam <- function(obs) {
+    lambz <- pred.lambdaz(obs[, 2], obs[, 1])
+    hl <- log(2)/lambz
+    ceiling(hl/4)*12
+  }
+
+  pred.lambdaz <- function(dv, t) {
     if (t[1] == 0) dv[1] <- 0
     mdv <- which(dv == 0)
     i <- 3
-    bestR2 <- 0
+    bestR2 <- -1
     bestk <- 0
-    auc <- 0
     if (length(dv[-mdv]) >= i) {
       repeat {
         mod <- suppressWarnings(lm(log(tail(dv[-mdv], i)) ~ tail(unique(t)[-mdv], i)))
@@ -753,15 +886,27 @@ pred.sumexp <- function(par, x, d = 0) {
             bestR2 <- R2
             bestk <- k
           } else {
-            auc <- tail(dv, 1)/bestk
             break
           }
         }
-        if (i == length(dv[-mdv])) break
+        if (i == 5 & bestk == 0) {
+          mdv <- c(mdv, which(dv == max(tail(dv[-mdv], 3))))
+          i <- 2
+        }
+        if (i == length(dv[-mdv])) {
+          if (bestk > 0) break
+          else {
+            i <- 2
+            mod <- suppressWarnings(lm(log(tail(dv, i)) ~ tail(unique(t), i)))
+            bestk <- -1*mod$coefficients["tail(unique(t), i)"]
+            if (bestk > 0) break
+            else browser()
+          }
+        }
         i <- i + 1
       }
     }
-    auc
+    bestk
   }
 
 # -----------------------------------------------------------------------------
@@ -795,6 +940,12 @@ pred.sumexp <- function(par, x, d = 0) {
       else auc[i-1] <- (C[i-1] + C[i])*h/2
     }
     return(sum(auc))
+  }
+
+  auc.interv.lam <- function(par, t) {
+    dv <- pred.sumexp(par, unique(t))
+    lambz <- pred.lambdaz(dv, t)
+    tail(dv, 1)/lambz
   }
 
 # Without for loop

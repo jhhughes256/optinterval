@@ -28,62 +28,57 @@
   source(paste(git.dir, reponame, "study_functions.R", sep = "/"))
 
 # -----------------------------------------------------------------------------
+  pred.lambdaz <- function(dv, t) {
+    if (t[1] == 0) dv[1] <- 0
+    mdv <- which(dv == 0)
+    i <- 3
+    bestR2 <- 0
+    bestk <- 0
+    auc <- 0
+    if (length(dv[-mdv]) >= i) {
+      repeat {
+        mod <- suppressWarnings(lm(log(tail(dv[-mdv], i)) ~ tail(unique(t)[-mdv], i)))
+        k <- -1*mod$coefficients["tail(unique(t)[-mdv], i)"]
+        R2 <- suppressWarnings(as.numeric(summary(mod)["adj.r.squared"]))
+        if (is.na(k)) browser()
+        if (is.nan(R2)) R2 <- suppressWarnings(as.numeric(summary(mod)["r.squared"]))
+        if (k > 0) {
+          if (R2 > bestR2) {
+            bestR2 <- R2
+            bestk <- k
+          } else {
+            auc <- tail(dv, 1)/bestk
+            break
+          }
+        }
+        if (i == length(dv[-mdv])) break
+        i <- i + 1
+      }
+    }
+    bestk
+  }
+
+  obs.tlast.lam <- function(obs) {
+    lambz <- pred.lambdaz(obs[, 2], obs[, 1])[1]
+    hl <- log(2)/lambz
+    ceiling(hl/4)*12
+  }
+
+  auc.interv.lam <- function(par, t) {
+    dv <- pred.sumexp(par, unique(t))
+    lambz <- pred.lambdaz(dv, t)
+    tail(dv, 1)/bestk
+  }
 
   par <- c(-0.06, -0.4, -0.6, log(exp(4)*0.15), log(exp(4)*0.85))
   tlast <- 24
   i <- round(tlast/12, 0)
-  obstimes <- seq(0, i*12, by = i*12/120)
+  obstimes <- seq(0, i*12, by = i*12/12)
   obsdata <- data.frame(
     times = obstimes,
     dv = pred.sumexp(par, obstimes)
   )
   optres <- chisq.sumexp(optim.sumexp(obsdata, oral = T))
-
-  pred.tlast <- function(fit.par, tlast) {
-    i <- round(tlast/12, 0)
-    perc.term <- 1
-    timeloop <- seq(0, i*12, by = i*12/120)
-    predloop <- pred.sumexp(fit.par, timeloop)
-    tmax <- timeloop[which(predloop == max(predloop))]
-    while(perc.term > 0.2) {
-      if (exists("init")) {
-        repeat {
-          i <- i + 1
-          timesloop <- seq(0, i*12, by = i*12/120)
-          predloop <- pred.sumexp(fit.par, timesloop)
-          clast <- tail(predloop, 1)
-          if (clast < cterm) break
-        }
-      }
-      clast <- tail(predloop, 1)
-      auclast <- auc.interv.sumexp(timeloop, fit.par, log = T)
-      lambz <- max(head(fit.par, ceiling(length(fit.par)/2)))
-      aucinf <- clast/-lambz
-      perc.term <- aucinf/(auclast+aucinf)
-      cterm <- clast*(0.18/perc.term)
-      init <- 1
-    }
-    return(c(i*12, 1-perc.term))
-  }
-
-  pred.tlast(optres$par, 24)
-
-
-
-  # i == 5
-
-  auc060 <- auc.interv.sumexp(timesloop, fit.par, log = T)
-  clast60 <- tail(predloop, 1)
-  auc60inf <- clast60/-lambz
-  auc60inf/(auc060+auc60inf)
-  # less than 10% we have gone too far
-
-  times24 <- seq(0, 2*tlast, by = 2*tlast/120)
-  pred24 <- pred.sumexp(fit.par, times24)
-  whichtmax <- which(data24$dv == max(data24$dv))
-  any(data24$dv[whichtmax:121] < newclast)
-
-  times36 <- seq(0, 36, by = 0.3)
-  pred24 <- pred.sumexp(fit.par, times24)
-  whichtmax <- which(data24$dv == max(data24$dv))
-  any(data24$dv[whichtmax:121] < newclast)
+  pred.tlast(optres$par, 12)
+  pred.tlast.lam(optres$par)
+  obs.tlast.lam(obsdata$dv, obsdata$times)

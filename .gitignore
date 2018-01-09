@@ -2,3 +2,5 @@ plot/
 *.rds
 .Rproj.user
 .Rhistory
+*.csv
+*.png
