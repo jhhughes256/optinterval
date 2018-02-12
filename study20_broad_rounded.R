@@ -31,6 +31,7 @@
   set.seed(256256)
   # set.seed(1337)
   niter <- 1000
+  min.int <- 0.25
   source(paste(git.dir, reponame, "study_functions.R", sep = "/"))
   source(paste(git.dir, reponame, "study_rdata_resamp.R", sep = "/"))
 
@@ -41,7 +42,7 @@
   fn.names <- paste("pred", data.names, sep = ".")
   t1.names <- paste(data.names, "t", sep = ".")
 
-  study.fn <- function(data, par, fn, nobs, t1, sdev = 1, tlast = 24, logauc = F) {  # sdev = 1:4
+  study.fn <- function(data, par, fn, nobs, t1, sdev = 2, tlast = 24, logauc = F) {  # sdev = 1:4
     niter <- dim(data)[2]
     absorp <- ifelse((dim(par)[1] %% 2) != 0, T, F)
     if (absorp) data[1, ] <- 0
@@ -73,21 +74,15 @@
         # , nexp = 2
       )
     })
-    res.sumexp <- try(lapply(all.sumexp, best.sumexp.aic))  # ".lrt)", ".aic)", ".bic, nobs = length(t1))"
-    # i <<- 0
-    # res.sumexp <- lapply(all.sumexp, function(x) {
-    #   i <<- i + 1
-    #   out <- try(best.sumexp.lrt(x))
-    #   if (class(out) == "try-error") browser()
-    #   out
-    # })
-    if (class(res.sumexp) == "try-error") browser()
+    res.sumexp <- lapply(all.sumexp, best.sumexp.aic)  # ".lrt)", ".aic)", ".bic, nobs = length(t1))"
     fit.par <- lapply(res.sumexp, function(x) x$sumexp)
     true.tlast <- apply(par, 2, function(x) {
       list(seq(0, pred.tlast.lam(x), length.out = length(t1)))
     })
     auc.tlast <- lapply(fit.par, function(x) {
-      seq(0, pred.tlast(x, 12)[1], length.out = length(t1))
+      out <- try(pred.tlast(x, 12)[1])
+      if (class(out) == "try-error") browser()
+      seq(0, out, length.out = length(t1))
     })
     lam.tlast <- lapply(fit.par, function(x) {
       seq(0, pred.tlast.lam(x), length.out = length(t1))
@@ -154,12 +149,13 @@
       optim.interv.dtmax(x, t[-(nobs-1)], tmax = T)$times
     })
 
+    rnum <- 1/min.int
     t000 <- sapply(t000.res, FUN = function(x) {
-      x$times
+      round(x$times*rnum, 0)/rnum
     })
     t001 <- sapply(t001.res, FUN = function(x) {
       geomean <- exp(mean(log(tail(x, 2))))
-      c(head(x, nobs-2), geomean, tail(x, 1))
+      round(c(head(x, nobs-2), geomean, tail(x, 1))*rnum, 0)/rnum
     })
     t002 <- mapply(t001.res, fit.par, FUN = function(x, fit) {
       tail.par <- tail(unique(x), 2)
@@ -181,17 +177,18 @@
         tfirst = tail.par[1], tlast = tail.par[2], fit = fit
       ))
       if (class(optres) == "try-error") {
-        sort(c(head(x, nobs-2), exp(mean(log(tail.par))), tail(x, 1)))
+        out <- sort(c(head(x, nobs-2), exp(mean(log(tail.par))), tail(x, 1)))
       } else {
-        sort(c(head(x, nobs-2), optres$par, tail(x, 1)))
+        out <- sort(c(head(x, nobs-2), optres$par, tail(x, 1)))
       }
+      round(out*rnum, 0)/rnum
     })
     t010 <- sapply(t010.res, FUN = function(x) {
-      x$times
+      round(x$times*rnum, 0)/rnum
     })
     t011 <- sapply(t011.res, FUN = function(x) {
       geomean <- exp(mean(log(tail(x, 2))))
-      c(head(x, nobs-2), geomean, tail(x, 1))
+      round(c(head(x, nobs-2), geomean, tail(x, 1))*rnum, 0)/rnum
     })
     t012 <- mapply(t011.res, fit.par, FUN = function(x, fit) {
       tail.par <- tail(unique(x), 2)
@@ -213,17 +210,18 @@
         tfirst = tail.par[1], tlast = tail.par[2], fit = fit
       ))
       if (class(optres) == "try-error") {
-        sort(c(head(x, nobs-2), exp(mean(log(tail.par))), tail(x, 1)))
+        out <- sort(c(head(x, nobs-2), exp(mean(log(tail.par))), tail(x, 1)))
       } else {
-        sort(c(head(x, nobs-2), optres$par, tail(x, 1)))
+        out <- sort(c(head(x, nobs-2), optres$par, tail(x, 1)))
       }
+      round(out*rnum, 0)/rnum
     })
     t020 <- sapply(t020.res, FUN = function(x) {
-      x$times
+      round(x$times*rnum, 0)/rnum
     })
     t021 <- sapply(t021.res, FUN = function(x) {
       geomean <- exp(mean(log(tail(x, 2))))
-      c(head(x, nobs-2), geomean, tail(x, 1))
+      round(c(head(x, nobs-2), geomean, tail(x, 1))*rnum, 0)/rnum
     })
     t022 <- mapply(t021.res, fit.par, FUN = function(x, fit) {
       tail.par <- tail(unique(x), 2)
@@ -245,17 +243,18 @@
         tfirst = tail.par[1], tlast = tail.par[2], fit = fit
       ))
       if (class(optres) == "try-error") {
-        sort(c(head(x, nobs-2), exp(mean(log(tail.par))), tail(x, 1)))
+        out <- sort(c(head(x, nobs-2), exp(mean(log(tail.par))), tail(x, 1)))
       } else {
-        sort(c(head(x, nobs-2), optres$par, tail(x, 1)))
+        out <- sort(c(head(x, nobs-2), optres$par, tail(x, 1)))
       }
+      round(out*rnum, 0)/rnum
     })
     t030 <- sapply(t030.res, FUN = function(x) {
-      x$times
+      round(x$times*rnum, 0)/rnum
     })
     t031 <- sapply(t031.res, FUN = function(x) {
       geomean <- exp(mean(log(tail(x, 2))))
-      c(head(x, nobs-2), geomean, tail(x, 1))
+      round(c(head(x, nobs-2), geomean, tail(x, 1))*rnum, 0)/rnum
     })
     t032 <- mapply(t031.res, fit.par, FUN = function(x, fit) {
       tail.par <- tail(unique(x), 2)
@@ -277,17 +276,18 @@
         tfirst = tail.par[1], tlast = tail.par[2], fit = fit
       ))
       if (class(optres) == "try-error") {
-        sort(c(head(x, nobs-2), exp(mean(log(tail.par))), tail(x, 1)))
+        out <- sort(c(head(x, nobs-2), exp(mean(log(tail.par))), tail(x, 1)))
       } else {
-        sort(c(head(x, nobs-2), optres$par, tail(x, 1)))
+        out <- sort(c(head(x, nobs-2), optres$par, tail(x, 1)))
       }
+      round(out*rnum, 0)/rnum
     })
     t100 <- sapply(t100.res, FUN = function(x) {
-      x$times
+      round(x$times*rnum, 0)/rnum
     })
     t101 <- sapply(t101.res, FUN = function(x) {
       geomean <- exp(mean(log(tail(x, 2))))
-      c(head(x, nobs-2), geomean, tail(x, 1))
+      round(c(head(x, nobs-2), geomean, tail(x, 1))*rnum, 0)/rnum
     })
     t102 <- mapply(t101.res, fit.par, FUN = function(x, fit) {
       tail.par <- tail(unique(x), 2)
@@ -309,17 +309,18 @@
         tfirst = tail.par[1], tlast = tail.par[2], fit = fit
       ))
       if (class(optres) == "try-error") {
-        sort(c(head(x, nobs-2), exp(mean(log(tail.par))), tail(x, 1)))
+        out <- sort(c(head(x, nobs-2), exp(mean(log(tail.par))), tail(x, 1)))
       } else {
-        sort(c(head(x, nobs-2), optres$par, tail(x, 1)))
+        out <- sort(c(head(x, nobs-2), optres$par, tail(x, 1)))
       }
+      round(out*rnum, 0)/rnum
     })
     t110 <- sapply(t110.res, FUN = function(x) {
-      x$times
+      round(x$times*rnum, 0)/rnum
     })
     t111 <- sapply(t111.res, FUN = function(x) {
       geomean <- exp(mean(log(tail(x, 2))))
-      c(head(x, nobs-2), geomean, tail(x, 1))
+      round(c(head(x, nobs-2), geomean, tail(x, 1))*rnum, 0)/rnum
     })
     t112 <- mapply(t111.res, fit.par, FUN = function(x, fit) {
       tail.par <- tail(unique(x), 2)
@@ -341,17 +342,18 @@
         tfirst = tail.par[1], tlast = tail.par[2], fit = fit
       ))
       if (class(optres) == "try-error") {
-        sort(c(head(x, nobs-2), exp(mean(log(tail.par))), tail(x, 1)))
+        out <- sort(c(head(x, nobs-2), exp(mean(log(tail.par))), tail(x, 1)))
       } else {
-        sort(c(head(x, nobs-2), optres$par, tail(x, 1)))
+        out <- sort(c(head(x, nobs-2), optres$par, tail(x, 1)))
       }
+      round(out*rnum, 0)/rnum
     })
     t120 <- sapply(t120.res, FUN = function(x) {
-      x$times
+      round(x$times*rnum, 0)/rnum
     })
     t121 <- sapply(t121.res, FUN = function(x) {
       geomean <- exp(mean(log(tail(x, 2))))
-      c(head(x, nobs-2), geomean, tail(x, 1))
+      round(c(head(x, nobs-2), geomean, tail(x, 1))*rnum, 0)/rnum
     })
     t122 <- mapply(t121.res, fit.par, FUN = function(x, fit) {
       tail.par <- tail(unique(x), 2)
@@ -373,17 +375,18 @@
         tfirst = tail.par[1], tlast = tail.par[2], fit = fit
       ))
       if (class(optres) == "try-error") {
-        sort(c(head(x, nobs-2), exp(mean(log(tail.par))), tail(x, 1)))
+        out <- sort(c(head(x, nobs-2), exp(mean(log(tail.par))), tail(x, 1)))
       } else {
-        sort(c(head(x, nobs-2), optres$par, tail(x, 1)))
+        out <- sort(c(head(x, nobs-2), optres$par, tail(x, 1)))
       }
+      round(out*rnum, 0)/rnum
     })
     t130 <- sapply(t130.res, FUN = function(x) {
-      x$times
+      round(x$times*rnum, 0)/rnum
     })
     t131 <- sapply(t131.res, FUN = function(x) {
       geomean <- exp(mean(log(tail(x, 2))))
-      c(head(x, nobs-2), geomean, tail(x, 1))
+      round(c(head(x, nobs-2), geomean, tail(x, 1))*rnum, 0)/rnum
     })
     t132 <- mapply(t131.res, fit.par, FUN = function(x, fit) {
       tail.par <- tail(unique(x), 2)
@@ -405,10 +408,11 @@
         tfirst = tail.par[1], tlast = tail.par[2], fit = fit
       ))
       if (class(optres) == "try-error") {
-        sort(c(head(x, nobs-2), exp(mean(log(tail.par))), tail(x, 1)))
+        out <- sort(c(head(x, nobs-2), exp(mean(log(tail.par))), tail(x, 1)))
       } else {
-        sort(c(head(x, nobs-2), optres$par, tail(x, 1)))
+        out <- sort(c(head(x, nobs-2), optres$par, tail(x, 1)))
       }
+      round(out*rnum, 0)/rnum
     })
 
     auc24 <- data.frame(
@@ -895,11 +899,11 @@
   # c - ofv comparitive criterion (1 - lrt, 2 - aic, 3 - bic)
   # d - error model (1 - loprop, 2- hiprop, 3 - loboth, 4- hiboth)
   setwd("E:/Hughes/Git/splines/fn_diag")
-  saveRDS(fin.res[[1]]$result, "d2b-gaiter100-AR3021.rds")
-  saveRDS(fin.res[[2]]$result, "d3b-gaiter100-AR3021.rds")
-  saveRDS(fin.res[[3]]$result, "d1a-gaiter100-AR3021.rds")
-  saveRDS(fin.res[[4]]$result, "d2a-gaiter100-AR3021.rds")
-  saveRDS(fin.res[[5]]$result, "d3a-gaiter100-AR3021.rds")
+  saveRDS(fin.res[[1]]$result, "d2b-round15-AR3022.rds")
+  saveRDS(fin.res[[2]]$result, "d3b-round15-AR3022.rds")
+  saveRDS(fin.res[[3]]$result, "d1a-round15-AR3022.rds")
+  saveRDS(fin.res[[4]]$result, "d2a-round15-AR3022.rds")
+  saveRDS(fin.res[[5]]$result, "d3a-round15-AR3022.rds")
 
   # source(paste(git.dir, reponame, "study_functions.R", sep = "/"))
   # fin.res <- list(NULL)

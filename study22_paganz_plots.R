@@ -23,6 +23,7 @@
   library(plyr)
   library(ggplot2)
   library(grid)
+  library(cowplot)
   theme_bw2 <- theme_set(theme_bw(base_size = 14))
   theme_update(plot.title = element_text(hjust = 0.5))
 
@@ -30,7 +31,7 @@
   source(paste(git.dir, reponame, "sumstat_functions.R", sep = "/"))
 
 # Source files of interest
-  run.string <- "sigfix-AR3022"
+  run.string <- "sigfix-AR3024"
   d2b <- readRDS(paste(git.dir, reponame,
     paste0("fn_diag/d2b-", run.string, ".rds"), sep = "/"))
   d3b <- readRDS(paste(git.dir, reponame,
@@ -537,23 +538,8 @@
     plotdata <- rbind(plotdata, d.out)
   }
 # -----------------------------------------------------------------------------
-# Table
-  broad.out <- ddply(plotdata, .(data, type, metric), function(x) {
-    prop <- with(x, test/ref)
-    stat1 <-  mean(prop, na.rm = T)
-    stat2 <-  sd(prop, na.rm = T)
-    out <- data.frame(
-      mean = stat1,
-      sd = stat2,
-      cv = stat2/stat1*100,
-      median = median(prop, na.rm = T),
-      CI90lo = quantile(prop, probs = 0.05, na.rm = T, names = F),
-      CI90hi = quantile(prop, probs = 0.95, na.rm = T, names = F),
-      n = length(na.omit(prop))
-    )
-  })
-  # write.csv(broad.out, "broad-output.csv")
-
+# Plots
+  setwd("E:/Hughes/Git/splines/fn_diag")
 # True vs. Pred
   plotdata$bioqf <- factor(plotdata$bioq)
   lineofid <- 10^seq(
@@ -563,25 +549,19 @@
   )
   bioqhiline <- data.frame(ref = lineofid, test = lineofid*1.25)
   bioqloline <- data.frame(ref = lineofid, test = lineofid*0.8)
-  plotdata2 <- plotdata
+  bioqhiline2 <- data.frame(ref = lineofid, test = lineofid*1.1)
+  bioqloline2 <- data.frame(ref = lineofid, test = lineofid*0.9)
+  plotdata2 <- plotdata[plotdata$type %in% c("030", "bas"),]
   plotdata2$typef <- factor(plotdata2$type)
-  levels(plotdata2$typef) <- c("otter", "otter+glam", "otter+olam",
-    "otter+auct", "otter+auct+glam", "otter+auct+olam",
-    "otter+halft", "otter+halft+glam", "otter+halft+olam",
-    "otter+obst", "otter+obst+glam", "otter+obst+olam",
-    "otter+tmax", "otter+tmax+glam", "otter+tmax+olam",
-    "otter+tmax+auct", "otter+tmax+auct+glam",
-    "otter+tmax+auct+olam", "otter+tmax+halft",
-    "otter+tmax+halft+glam", "otter+tmax+halft+olam", "otter+tmax+obst",
-    "otter+tmax+obst+glam", "otter+tmax+obst+olam", "basic")
+  levels(plotdata2$typef) <- c("Algorithm", "Empirical")
   statdata <- ddply(plotdata2, .(data, metric, typef), function(x) {
     data.frame(
-      percbioq = paste0("bioq = ", signif((1 - sum(x$bioq, na.rm = T)/length(x$bioq))*100, 3), "%"),
+      percbioq = paste0("bioq = ", signif(sum(x$bioq, na.rm = T)/length(x$bioq)*100, 3), "%"),
       meanratio = paste("mean =", round(mean(x$prop), 2))
     )
   })
 
-  truevpred.plot <- function(data, metric, n.col) {
+  truevpred.plot <- function(data, metric, n.col, scale) {
     plotsub <- plotdata2[plotdata2$data == data & plotdata2$metric == metric, ]
     statsub <- statdata[statdata$data == data & statdata$metric == metric, ]
     allval <- c(plotsub$ref)
@@ -590,292 +570,79 @@
     valrange <- log10(maxval) - log10(minval)
     p0 <- NULL
     p0 <- ggplot()
-    p0 <- p0 + ggtitle(paste("True vs. Predicted", metric, "-", data))
     p0 <- p0 + geom_point(aes(x = ref, y = test, colour = bioqf), data = plotsub, alpha = 0.2)
-    p0 <- p0 + geom_line(aes(x = ref, y = test), data = bioqhiline,
-      colour = "green4", linetype = "dashed")
-    p0 <- p0 + geom_line(aes(x = ref, y = test), data = bioqloline,
-      colour = "green4", linetype = "dashed")
+    if (metric == "tmax") {
+      p0 <- p0 + geom_line(aes(x = ref, y = test), data = bioqhiline,
+        colour = "green4", linetype = "dashed")
+      p0 <- p0 + geom_line(aes(x = ref, y = test), data = bioqloline,
+        colour = "green4", linetype = "dashed")
+      p0 <- p0 + scale_x_log10("True tmax", lim = c(minval, maxval), breaks = scale)
+      p0 <- p0 + scale_y_log10("Predicted tmax", lim = c(minval, maxval), breaks = scale)
+    } else {
+      p0 <- p0 + geom_line(aes(x = ref, y = test), data = bioqhiline2,
+        colour = "green4", linetype = "dashed")
+      p0 <- p0 + geom_line(aes(x = ref, y = test), data = bioqloline2,
+        colour = "green4", linetype = "dashed")
+      if (metric == "cmax") {
+        p0 <- p0 + scale_x_log10("True Cmax", lim = c(minval, maxval), breaks = scale)
+        p0 <- p0 + scale_y_log10("Predicted Cmax", lim = c(minval, maxval), breaks = scale)
+      } else {
+        p0 <- p0 + scale_x_log10("True AUC", lim = c(minval, maxval), breaks = scale, labels = scales::comma)
+        p0 <- p0 + scale_y_log10("Predicted AUC", lim = c(minval, maxval), breaks = scale, labels = scales::comma)
+      }
+    }
     p0 <- p0 + geom_abline(intercept = 0, slope = 1)
-    p0 <- p0 + geom_text(aes(label = percbioq), data = statsub,
-      x = log10(minval)+valrange*0.29, y = log10(maxval)-valrange*0.11)
-    p0 <- p0 + geom_text(aes(label = meanratio), data = statsub,
-      x = log10(maxval)-valrange*0.29, y = log10(minval)+valrange*0.11)
-    p0 <- p0 + scale_x_log10("True AUC", lim = c(minval, maxval))
-    p0 <- p0 + scale_y_log10("Predicted AUC", lim = c(minval, maxval))
     p0 <- p0 + scale_colour_manual(values = c("blue", "red"))
     p0 <- p0 + theme(legend.position = "none")
     p0 <- p0 + facet_wrap(~typef, ncol = n.col)
     p0
   }
 
-  p11 <- truevpred.plot("d2b", "auc24", 6)
-  p12 <- truevpred.plot("d3b", "auc24", 6)
-  p13 <- truevpred.plot("d1a", "auc24", 6)
-  p14 <- truevpred.plot("d2a", "auc24", 6)
-  p15 <- truevpred.plot("d3a", "auc24", 6)
-  p21 <- truevpred.plot("d2b", "auctlast", 6)
-  p22 <- truevpred.plot("d3b", "auctlast", 6)
-  p23 <- truevpred.plot("d1a", "auctlast", 6)
-  p24 <- truevpred.plot("d2a", "auctlast", 6)
-  p25 <- truevpred.plot("d3a", "auctlast", 6)
-  p31 <- truevpred.plot("d2b", "aucinf", 6)
-  p32 <- truevpred.plot("d3b", "aucinf", 6)
-  p33 <- truevpred.plot("d1a", "aucinf", 6)
-  p34 <- truevpred.plot("d2a", "aucinf", 6)
-  p35 <- truevpred.plot("d3a", "aucinf", 6)
-  p41 <- truevpred.plot("d1a", "cmax", 6)
-  p42 <- truevpred.plot("d2a", "cmax", 6)
-  p43 <- truevpred.plot("d3a", "cmax", 6)
-  p51 <- truevpred.plot("d1a", "tmax", 6)
-  p52 <- truevpred.plot("d2a", "tmax", 6)
-  p53 <- truevpred.plot("d3a", "tmax", 6)
+  truevpred.plot("d3a", "aucinf", 2)
+  ggsave("truevpred_paganz.png", width = 23.2, height = 11.2, units = "cm")
 
-  plotdata2 <- plotdata[plotdata$type %in% c("000", "030", "100", "130", "bas"), ]
-  plotdata2$typef <- factor(plotdata2$type)
-  levels(plotdata2$typef) <- c("otter", "otter+obst", "otter+tmax", "otter+tmax+obst", "basic")
-  statdata <- ddply(plotdata2, .(data, metric, typef), function(x) {
-    data.frame(
-      percbioq = paste0("bioq = ", signif((1 - sum(x$bioq, na.rm = T)/length(x$bioq))*100, 3), "%"),
-      meanratio = paste("mean =", round(mean(x$prop), 2))
-    )
-  })
+  theme_update(axis.text.x = element_text(angle = 335))
 
-  s11 <- truevpred.plot("d2b", "auc24", 6)
-  s12 <- truevpred.plot("d3b", "auc24", 6)
-  s13 <- truevpred.plot("d1a", "auc24", 6)
-  s14 <- truevpred.plot("d2a", "auc24", 6)
-  s15 <- truevpred.plot("d3a", "auc24", 6)
-  s21 <- truevpred.plot("d2b", "auctlast", 3)
-  s22 <- truevpred.plot("d3b", "auctlast", 3)
-  s23 <- truevpred.plot("d1a", "auctlast", 3)
-  s24 <- truevpred.plot("d2a", "auctlast", 3)
-  s25 <- truevpred.plot("d3a", "auctlast", 3)
-  s31 <- truevpred.plot("d2b", "aucinf", 3)
-  s32 <- truevpred.plot("d3b", "aucinf", 3)
-  s33 <- truevpred.plot("d1a", "aucinf", 3)
-  s34 <- truevpred.plot("d2a", "aucinf", 3)
-  s35 <- truevpred.plot("d3a", "aucinf", 3)
-  s41 <- truevpred.plot("d1a", "cmax", 3)
-  s42 <- truevpred.plot("d2a", "cmax", 3)
-  s43 <- truevpred.plot("d3a", "cmax", 3)
-  s51 <- truevpred.plot("d1a", "tmax", 3)
-  s52 <- truevpred.plot("d2a", "tmax", 3)
-  s53 <- truevpred.plot("d3a", "tmax", 3)
+  p1 <- truevpred.plot("d2b", "aucinf", 2, c(10, 100, 1000, 10000))
+  p2 <- truevpred.plot("d3b", "aucinf", 2, c(10, 1000, 100000))
+  p3 <- truevpred.plot("d3a", "aucinf", 2, c(3, 300, 30000))
+  p4 <- truevpred.plot("d3a", "cmax", 2, c(1, 10, 100))
+  p5 <- truevpred.plot("d3a", "tmax", 2, c(1, 3, 10))
 
-  # plotsub <- plotdata[plotdata$data == "d2b" & plotdata$metric == "auc24", ]
-  # minval <- min(c(plotsub$test, plotsub$ref), na.rm = T)
-  # maxval <- max(c(plotsub$test, plotsub$ref), na.rm = T)
-  # p01 <- NULL
-  # p01 <- ggplot()
-  # p01 <- p01 + ggtitle("True vs. Predicted AUC (0-24) - d2b")
-  # p01 <- p01 + geom_point(aes(x = ref, y = test, colour = bioqf), data = plotsub)
-  # p01 <- p01 + geom_line(aes(x = ref, y = test), data = bioqhiline, colour = "green4", linetype = "dashed")
-  # p01 <- p01 + geom_line(aes(x = ref, y = test), data = bioqloline, colour = "green4", linetype = "dashed")
-  # p01 <- p01 + geom_abline(intercept = 0, slope = 1)
-  # p01 <- p01 + scale_x_log10("True AUC", lim = c(minval, maxval))
-  # p01 <- p01 + scale_y_log10("Predicted AUC", lim = c(minval, maxval))
-  # p01 <- p01 + scale_colour_manual(values = c("red", "blue"))
-  # p01 <- p01 + facet_wrap(~typef, ncol = 6)
-  # p01
+  plot_grid(p3, p4, p5, p2, ncol = 3, label_fontface = "plain")
+  ggsave("truevpred_paganz_cow_adj.png", width = 24.2, height = 12.2, units = "cm")
 
-# Box plot
-  subdata <- plotdata
-  subdata$typef <- as.factor(subdata$type)
-  levels(subdata$typef) <- c("otter", "otter+glam", "otter+olam",
-    "otter+auct", "otter+auct+glam", "otter+auct+olam",
-    "otter+halft", "otter+halft+glam", "otter+halft+olam",
-    "otter+obst", "otter+obst+glam", "otter+obst+olam",
-    "otter+tmax", "otter+tmax+glam", "otter+tmax+olam",
-    "otter+tmax+auct", "otter+tmax+auct+glam",
-    "otter+tmax+auct+olam", "otter+tmax+halft",
-    "otter+tmax+halft+glam", "otter+tmax+halft+olam", "otter+tmax+obst",
-    "otter+tmax+obst+glam", "otter+tmax+obst+olam", "basic")
-  subdata <- ddply(subdata, .(data, typef, metric), function(x) {
+  theme_bw2 <- theme_set(theme_bw(base_size = 14))
+  theme_update(plot.title = element_text(hjust = 0.5))
+
+  plotdata2$dataf <- factor(plotdata2$data)
+  levels(plotdata2$dataf) <- c("2-comp bolus", "3-comp bolus", "1-comp w/ abs", "2-comp w/ abs", "3-comp w/ abs")
+  subdata <- ddply(plotdata2, .(data, dataf, typef, metric), function(x) {
     data.frame(
       prop = x$prop,
       CI90lo = quantile(x$prop, probs = 0.05, na.rm = T, names = F),
-      CI90hi = quantile(x$prop, probs = 0.95, na.rm = T, names = F),
-      CI95lo = quantile(x$prop, probs = 0.025, na.rm = T, names = F),
-      CI95hi = quantile(x$prop, probs = 0.975, na.rm = T, names = F)
+      CI75lo = quantile(x$prop, probs = 0.25, na.rm = T, names = F),
+      CI50 = median(x$prop),
+      CI75hi = quantile(x$prop, probs = 0.75, na.rm = T, names = F),
+      CI90hi = quantile(x$prop, probs = 0.95, na.rm = T, names = F)
     )
   })
-  plotauc24 <- subdata[subdata$metric == "auc24", ]
-  plotauctlast <- subdata[subdata$metric == "auctlast", ]
   plotaucinf <- subdata[subdata$metric == "aucinf", ]
   plotcmax <- subdata[subdata$metric == "cmax" & subdata$data %in% c("d1a", "d2a", "d3a"), ]
   plottmax <- subdata[subdata$metric == "tmax" & subdata$data %in% c("d1a", "d2a", "d3a"), ]
 
-  p1 <- NULL
-  p1 <- ggplot(plotauc24, aes(x = typef, y = prop))
-  p1 <- p1 + geom_hline(yintercept = c(0.8, 1.25), color = "green4", linetype = "dashed")
-  p1 <- p1 + geom_hline(yintercept = 1, color = "red", linetype = "dashed")
-  # p1 <- p1 + geom_boxplot(aes(ymin = CI90lo, ymax = CI90hi))
-  p1 <- p1 + geom_boxplot(aes(ymin = CI95lo, ymax = CI95hi))
-  p1 <- p1 + ggtitle("Broad Study AUC (0-24)")
-  p1 <- p1 + xlab("\nMethod")
-  p1 <- p1 + scale_y_continuous("Method/Reference Ratio\n", lim = c(0, 5))
-  p1 <- p1 + facet_wrap(~data, nrow = 1)
-  p1
-
-  p2 <- ggplot(plotauctlast, aes(x = typef, y = prop))
-  p2 <- p2 + geom_hline(yintercept = c(0.8, 1.25), color = "green4", linetype = "dashed")
-  p2 <- p2 + geom_hline(yintercept = 1, color = "red", linetype = "dashed")
-  # p2 <- p2 + geom_boxplot(aes(ymin = CI90lo, ymax = CI90hi))
-  p2 <- p2 + geom_boxplot(aes(ymin = CI95lo, ymax = CI95hi))
-  p2 <- p2 + ggtitle("Broad Study AUC (0-tlast)")
-  p2 <- p2 + xlab("\nMethod")
-  p2 <- p2 + scale_y_continuous("Method/Reference Ratio\n", lim = c(0, 5))
-  p2 <- p2 + facet_wrap(~data, nrow = 1)
-  p2
-
-  p3 <- ggplot(plotaucinf, aes(x = typef, y = prop))
-  p3 <- p3 + geom_hline(yintercept = c(0.8, 1.25), color = "green4", linetype = "dashed")
-  p3 <- p3 + geom_hline(yintercept = 1, color = "red", linetype = "dashed")
-  # p3 <- p3 + geom_boxplot(aes(ymin = CI90lo, ymax = CI90hi))
-  p3 <- p3 + geom_boxplot(aes(ymin = CI95lo, ymax = CI95hi))
-  p3 <- p3 + ggtitle("Broad Study AUC (0-Inf)")
-  p3 <- p3 + xlab("\nMethod")
-  p3 <- p3 + scale_y_continuous("Method/Reference Ratio\n", lim = c(0, 5))
-  p3 <- p3 + facet_wrap(~data, nrow = 1)
-  p3
-
-  p4 <- ggplot(plotcmax, aes(x = typef, y = prop))
-  p4 <- p4 + geom_hline(yintercept = c(0.8, 1.25), color = "green4", linetype = "dashed")
-  p4 <- p4 + geom_hline(yintercept = 1, color = "red", linetype = "dashed")
-  # p4 <- p4 + geom_boxplot(aes(ymin = CI90lo, ymax = CI90hi))
-  p4 <- p4 + geom_boxplot(aes(ymin = CI95lo, ymax = CI95hi))
-  p4 <- p4 + ggtitle("Broad Study Cmax")
-  p4 <- p4 + xlab("\nMethod")
-  p4 <- p4 + scale_y_continuous("Method/Reference Ratio\n", lim = c(0, 5))
-  p4 <- p4 + facet_wrap(~data, nrow = 1)
-  p4
-
-  p5 <- ggplot(plottmax, aes(x = typef, y = prop))
-  p5 <- p5 + geom_hline(yintercept = c(0.8, 1.25), color = "green4", linetype = "dashed")
-  p5 <- p5 + geom_hline(yintercept = 1, color = "red", linetype = "dashed")
-  # p5 <- p5 + geom_boxplot(aes(ymin = CI90lo, ymax = CI90hi))
-  p5 <- p5 + geom_boxplot(aes(ymin = CI95lo, ymax = CI95hi))
-  p5 <- p5 + ggtitle("Broad Study Tmax")
-  p5 <- p5 + xlab("\nMethod")
-  p5 <- p5 + scale_y_continuous("Method/Reference Ratio\n", lim = c(0, 5))
-  p5 <- p5 + facet_wrap(~data, nrow = 1)
-  p5
-
-  s1 <- NULL
-  s1 <- ggplot(plotauc24[plotauc24$typef %in% c("otter", "otter+obst", "otter+tmax", "otter+tmax+obst", "basic"), ], aes(x = typef, y = prop))
-  s1 <- s1 + geom_hline(yintercept = c(0.8, 1.25), color = "green4", linetype = "dashed")
-  s1 <- s1 + geom_hline(yintercept = 1, color = "red", linetype = "dashed")
-  # s1 <- s1 + geom_boxplot(aes(ymin = CI90lo, ymax = CI90hi))
-  s1 <- s1 + geom_boxplot(aes(ymin = CI95lo, ymax = CI95hi))
-  s1 <- s1 + ggtitle("Broad Study AUC (0-24)")
-  s1 <- s1 + xlab("\nMethod")
-  s1 <- s1 + ylab("Method/Reference Ratio\n")
-  s1 <- s1 + facet_wrap(~data, nrow = 1)
-  s1
-
-  s2 <- ggplot(plotauctlast[plotauctlast$typef %in% c("otter", "otter+obst", "otter+tmax", "otter+tmax+obst", "basic"), ], aes(x = typef, y = prop))
-  s2 <- s2 + geom_hline(yintercept = c(0.8, 1.25), color = "green4", linetype = "dashed")
-  s2 <- s2 + geom_hline(yintercept = 1, color = "red", linetype = "dashed")
-  # s2 <- s2 + geom_boxplot(aes(ymin = CI90lo, ymax = CI90hi))
-  s2 <- s2 + geom_boxplot(aes(ymin = CI95lo, ymax = CI95hi))
-  s2 <- s2 + ggtitle("Broad Study AUC (0-tlast)")
-  s2 <- s2 + xlab("\nMethod")
-  s2 <- s2 + ylab("Method/Reference Ratio\n")
-  s2 <- s2 + facet_wrap(~data, nrow = 1)
-  s2
-
-  s3 <- ggplot(plotaucinf[plotaucinf$typef %in% c("otter", "otter+obst", "otter+tmax", "otter+tmax+obst", "basic"), ], aes(x = typef, y = prop))
-  s3 <- s3 + geom_hline(yintercept = c(0.8, 1.25), color = "green4", linetype = "dashed")
-  s3 <- s3 + geom_hline(yintercept = 1, color = "red", linetype = "dashed")
-  # s3 <- s3 + geom_boxplot(aes(ymin = CI90lo, ymax = CI90hi))
-  s3 <- s3 + geom_boxplot(aes(ymin = CI95lo, ymax = CI95hi))
-  s3 <- s3 + ggtitle("Broad Study AUC (0-Inf)")
-  s3 <- s3 + xlab("\nMethod")
-  s3 <- s3 + ylab("Method/Reference Ratio\n")
-  s3 <- s3 + facet_wrap(~data, nrow = 1)
-  s3
-
-  s4 <- ggplot(plotcmax[plotcmax$typef %in% c("otter", "otter+obst", "otter+tmax", "otter+tmax+obst", "basic"), ], aes(x = typef, y = prop))
-  s4 <- s4 + geom_hline(yintercept = c(0.8, 1.25), color = "green4", linetype = "dashed")
-  s4 <- s4 + geom_hline(yintercept = 1, color = "red", linetype = "dashed")
-  # s4 <- s4 + geom_boxplot(aes(ymin = CI90lo, ymax = CI90hi))
-  s4 <- s4 + geom_boxplot(aes(ymin = CI95lo, ymax = CI95hi))
-  s4 <- s4 + ggtitle("Broad Study Cmax")
-  s4 <- s4 + xlab("\nMethod")
-  s4 <- s4 + ylab("Method/Reference Ratio\n")
-  s4 <- s4 + facet_wrap(~data, nrow = 1)
-  s4
-
-  s5 <- ggplot(plottmax[plottmax$typef %in% c("otter", "otter+obst", "otter+tmax", "otter+tmax+obst", "basic"), ], aes(x = typef, y = prop))
-  s5 <- s5 + geom_hline(yintercept = c(0.8, 1.25), color = "green4", linetype = "dashed")
-  s5 <- s5 + geom_hline(yintercept = 1, color = "red", linetype = "dashed")
-  # s5 <- s5 + geom_boxplot(aes(ymin = CI90lo, ymax = CI90hi))
-  s5 <- s5 + geom_boxplot(aes(ymin = CI95lo, ymax = CI95hi))
-  s5 <- s5 + ggtitle("Broad Study Tmax")
-  s5 <- s5 + xlab("\nMethod")
-  s5 <- s5 + ylab("Method/Reference Ratio\n")
-  s5 <- s5 + facet_wrap(~data, nrow = 1)
-  s5
-
-# Attempt at new plots using %difference from truth
-  plotdata3 <- plotdata[plotdata$type %in% c("000", "030", "bas"), ]
-  plotdata3$diff <- abs(1 - plotdata3$prop)
-  plotdata3 <- ddply(plotdata3, .(type, metric, data), function(x) {
-    x$diffrank <- rank(x$diff, ties.method = "first")/1000
-    x$diffrank
-    x
-  })
-
-  p6 <- NULL
-  p6 <- ggplot(data = plotdata3[plotdata3$metric == "aucinf" & plotdata3$data == "d1a", ])
-  p6 <- p6 + geom_line(aes(x = diffrank, y = diff*100), size = 0.8)
-  p6 <- p6 + ggtitle("Percent Difference From Truth - AUC")
-  p6 <- p6 + xlab("\nRanked PK Profiles")
-  p6 <- p6 + ylab("Difference in AUC (%)\n")
-  p6 <- p6 + facet_wrap(~type, nrow = 1)
-  p6
-
   p7 <- NULL
-  p7 <- ggplot(data = plotdata3[plotdata3$metric == "aucinf", ])
-  p7 <- p7 + geom_line(aes(x = diffrank, y = diff*100, colour = type), size = 0.8)
-  p7 <- p7 + ggtitle("Percent Difference From Truth - AUC")
-  p7 <- p7 + xlab("\nRanked PK Profiles")
-  p7 <- p7 + ylab("Difference in AUC (%)\n")
-  p7 <- p7 + facet_wrap(~data, nrow = 1)
-  p7
+  p7 <- ggplot(plotaucinf, aes(x = typef, y = prop))
+  p7 <- p7 + geom_hline(yintercept = c(0.9, 1.1), color = "green4", linetype = "dashed")
+  p7 <- p7 + geom_hline(yintercept = 1, color = "red", linetype = "dashed")
+  # p7 <- p7 + geom_boxplot(aes(ymin = CI90lo, ymax = CI90hi))
+  p7 <- p7 + geom_boxplot(stat = "identity",
+    aes(ymin = CI90lo, lower = CI75lo, middle = CI50, upper = CI75hi, ymax = CI90hi)
+  )
+  p7 <- p7 + xlab("\nMethod")
+  p7 <- p7 + scale_y_continuous("Method/Reference AUC Ratio\n", breaks = c(0.5, 0.6, 0.7, 0.8, 0.9, 1, 1.1, 1.2))
+  p7 <- p7 + facet_wrap(~dataf, nrow = 1)
+  p7 + coord_cartesian(ylim = c(0.45, 1.2))
 
-# Attempt at new plots using difference in % difference from Truth
-  basdata <- plotdata3[plotdata3$type == "bas", ]
-  plotdata3 <- ddply(plotdata3, .(type, metric, data), function(x) {
-    x.metric <- unique(x$metric)
-    x.data <- unique(x$data)
-    bassub <- basdata[basdata$metric == x.metric & basdata$data == x.data, ]
-    x$diffbase <- bassub$diff - x$diff
-    x$diffbaserank <- rank(x$diffbase, ties.method = "first")/1000
-    if (unique(x$type) == "bas") {
-      x$diffbasemed <- NA
-    } else {
-      x$diffbasemed <- x$diffbaserank[which(abs(x$diffbase) == min(abs(x$diffbase), na.rm = T))][1]
-    }
-    x
-  })
 
-  p8 <- NULL
-  p8 <- ggplot(data = plotdata3[plotdata3$metric == "aucinf" & plotdata3$data == "d2a", ])
-  p8 <- p8 + geom_line(aes(x = diffbaserank, y = diffbase*100, colour = type), size = 0.8)
-  p8 <- p8 + ggtitle("Percent Difference From Empirical - AUC")
-  p8 <- p8 + xlab("\nRanked PK Profiles")
-  p8 <- p8 + ylab("Difference in AUC (%)\n")
-  p8 <- p8 + facet_wrap(~type, nrow = 1)
-  p8
-
-  p9 <- NULL
-  p9 <- ggplot(data = plotdata3[plotdata3$metric == "aucinf", ])
-  p9 <- p9 + geom_line(aes(x = diffbaserank, y = diffbase*100, colour = type), size = 0.8)
-  p9 <- p9 + geom_vline(aes(xintercept = diffbasemed, colour = type))
-  p9 <- p9 + ggtitle("Percent Difference From Empirical - AUC")
-  p9 <- p9 + xlab("\nRanked PK Profiles")
-  p9 <- p9 + ylab("Difference in AUC (%)\n")
-  p9 <- p9 + facet_wrap(~data, nrow = 1)
-  p9
+  ggsave("boxplot_paganz_adj.png", width = 23.2, height = 11.2, units = "cm")

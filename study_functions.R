@@ -366,7 +366,7 @@
       lm.mod <- lm(log(y[lm.sub]) ~ x[lm.sub])
       lmres <- unname(lm.mod$coefficients)
       if (is.na(lmres[2])) {
-        lmres <- c(max(y), -0.00001)
+        lmres <- c(max(y), -pred.lambdaz(y, x))
         break
       }
       if (lmres[2] < 0) break
@@ -461,9 +461,6 @@
   #        second column dependent variable
   # oral = whether the drug displays an absorption curve
   # nexp = maximum fitted number of exponentials
-  # Prepare data (remove t == 0, remove negative concentrations)
-    x <- data[which(data[, 2] > 0 & data[, 1] != 0), 1]
-    y <- data[which(data[, 2] > 0 & data[, 1] != 0), 2]
   # Set up objects
     res <- list(par = NULL, sumexp = NULL, value = NULL,
     error = NULL, hessian = NULL, message = NULL)
@@ -473,12 +470,16 @@
     # opt.con <- list(NULL)
     # opt.mes <- list(NULL)
     # opt.hes <- list(NULL)
+  # Prepare data (remove t == 0, remove negative concentrations)
+    x <- data[which(data[, 2] > 0 & data[, 1] != 0), 1]
+    y <- data[which(data[, 2] > 0 & data[, 1] != 0), 2]
+    lmres <- -pred.lambdaz(y, x)[1]
     lm.sub <- which(y == max(y))[1]:length(y)
     repeat {
       lm.mod <- lm(log(y[lm.sub]) ~ x[lm.sub])
       lmres <- unname(lm.mod$coefficients)
       if (is.na(lmres[2])) {
-        lmres <- c(max(y), -0.00001)
+        lmres <- c(max(y), -pred.lambdaz(y, x))
         break
       }
       if (lmres[2] < 0) break
@@ -883,24 +884,26 @@
         if (is.nan(R2)) R2 <- suppressWarnings(as.numeric(summary(mod)["r.squared"]))
         if (k > 0) {
           if (R2 > bestR2) {
-            bestR2 <- R2
+            if (i > 2) bestR2 <- R2
             bestk <- k
           } else {
             break
           }
         }
-        if (i == 5 & bestk == 0) {
+        if (i == 5 & bestk == 0) {  #
           mdv <- c(mdv, which(dv == max(tail(dv[-mdv], 3))))
-          i <- 2
+          i <- 1
         }
-        if (i == length(dv[-mdv])) {
+        if (i == length(dv[-mdv])) {  # last ditch effort (intended for simulation study only)
           if (bestk > 0) break
           else {
-            i <- 2
-            mod <- suppressWarnings(lm(log(tail(dv, i)) ~ tail(unique(t), i)))
-            bestk <- -1*mod$coefficients["tail(unique(t), i)"]
+            mod <- suppressWarnings(lm(log(tail(dv, 2)) ~ tail(unique(t), 2)))
+            bestk <- -1*mod$coefficients["tail(unique(t), 2)"]
             if (bestk > 0) break
-            else browser()
+            else {
+              bestk <- log(2)/56
+              break
+            }
           }
         }
         i <- i + 1
@@ -944,7 +947,7 @@
 
   auc.interv.lam <- function(par, t) {
     dv <- pred.sumexp(par, unique(t))
-    lambz <- pred.lambdaz(dv, t)
+    lambz <- pred.lambdaz(dv, unique(t))
     tail(dv, 1)/lambz
   }
 

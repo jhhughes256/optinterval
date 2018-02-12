@@ -29,10 +29,10 @@
 
 # Source scripts to set up environment
   set.seed(256256)
-  # set.seed(1337)
   niter <- 1000
-  source(paste(git.dir, reponame, "study_functions.R", sep = "/"))
-  source(paste(git.dir, reponame, "study_rdata_resamp.R", sep = "/"))
+  sdev <- 1
+  source(paste(git.dir, reponame, "fn_diag/fix_functions.R", sep = "/"))
+  source(paste(git.dir, reponame, "fn_diag/study_rdata_resamp.R", sep = "/"))
 
 # -----------------------------------------------------------------------------
 # Set basic parameters
@@ -41,63 +41,42 @@
   fn.names <- paste("pred", data.names, sep = ".")
   t1.names <- paste(data.names, "t", sep = ".")
 
-  study.fn <- function(data, par, fn, nobs, t1, sdev = 1, tlast = 24, logauc = F) {  # sdev = 1:4
+  study.fn <- function(data, par, fn, nobs, t1, tlast = 24, logauc = F) {  # sdev = 1:4
     niter <- dim(data)[2]
     absorp <- ifelse((dim(par)[1] %% 2) != 0, T, F)
     if (absorp) data[1, ] <- 0
-    subd <- data[which(time.samp %in% t1),]
-    if (sdev <= 2) {
-      if (sdev == 1) err.sig <- 0.05
-      if (sdev == 2) err.sig <- 0.15
-      eps1 <- matrix(
-        1 + rnorm(n = length(t1)*niter, mean = 0, sd = err.sig),
-        nrow = length(t1), ncol = niter
-      )
-      obs <- subd*eps1
-    } else {
-      if (sdev == 3) err.sig <- 0.05
-      if (sdev == 4) err.sig <- 0.1
-      eps1 <- matrix(
-        rnorm(n = length(t1)*niter, mean = 0, sd = err.sig),
-        nrow = length(t1), ncol = niter
-      )
-      eps2 <- apply(subd, 2, function(x) {
-        rnorm(n = length(t1), mean = 0, sd = tail(x, 1)*err.sig)
-      })
-      obs <- subd*(1 + eps1) + eps2
-    }
-    all.sumexp <- apply(obs, 2, function(x) {
+    all.sumexp <- apply(data, 2, function(x) {
       optim.sumexp.new(
       # optim.sumexp.sig(
         data.frame(time = t1, conc = x), oral = absorp
         # , nexp = 2
       )
     })
-    res.sumexp <- try(lapply(all.sumexp, best.sumexp.aic))  # ".lrt)", ".aic)", ".bic, nobs = length(t1))"
-    # i <<- 0
-    # res.sumexp <- lapply(all.sumexp, function(x) {
-    #   i <<- i + 1
-    #   out <- try(best.sumexp.lrt(x))
-    #   if (class(out) == "try-error") browser()
-    #   out
-    # })
-    if (class(res.sumexp) == "try-error") browser()
+    print("sumexp done")
+    res.sumexp <- lapply(all.sumexp, best.sumexp.aic)  # ".lrt)", ".aic)", ".bic, nobs = length(t1))"
     fit.par <- lapply(res.sumexp, function(x) x$sumexp)
     true.tlast <- apply(par, 2, function(x) {
       list(seq(0, pred.tlast.lam(x), length.out = length(t1)))
     })
     auc.tlast <- lapply(fit.par, function(x) {
-      seq(0, pred.tlast(x, 12)[1], length.out = length(t1))
+      out <- pred.tlast(x, 12)[1]
+      if (out == 0) browser()
+      seq(0, out, length.out = length(t1))
+    })
+    lapply(auc.tlast, function(x) {
+      if (tail(x, 1) == 0) 0
+      else 1
     })
     lam.tlast <- lapply(fit.par, function(x) {
       seq(0, pred.tlast.lam(x), length.out = length(t1))
     })
-    obs.tlast.mat <- apply(obs, 2, function(x) {
+    obs.tlast.mat <- apply(data, 2, function(x) {
       out <- try(seq(0, obs.tlast.lam(data.frame(t1, x)), length.out = length(t1)))
       if (class(out) == "try-error") browser()
       out
     })
     obs.tlast <- split(t(obs.tlast.mat), seq(NROW(t(obs.tlast.mat))))
+    print("tlast done")
   # Explanation of Option Naming
   #         a b c
   #       t 0 0 0
@@ -153,7 +132,7 @@
     t131.res <- mapply(fit.par, obs.tlast, SIMPLIFY = F, FUN = function(x, t) {
       optim.interv.dtmax(x, t[-(nobs-1)], tmax = T)$times
     })
-
+    print("intervals done")
     t000 <- sapply(t000.res, FUN = function(x) {
       x$times
     })
@@ -410,7 +389,7 @@
         sort(c(head(x, nobs-2), optres$par, tail(x, 1)))
       }
     })
-
+    print("times done")
     auc24 <- data.frame(
       true = apply(par, 2, function(x) integrate(fn, 0, 24, p = x)$value),
       basic = apply(par, 2, function(x) auc.interv(t1, x, fn)),
@@ -643,8 +622,7 @@
       }),
       t101 = mapply(data.frame(par), data.frame(t101), FUN = function(x, t) {
         auc <- auc.interv(t, x, fn)
-        inf <- try(auc.interv.lam(x, t))
-        if (class(inf) == "try-error") browser()
+        inf <- auc.interv.lam(x, t)
         auc + inf
       }),
       t102 = mapply(data.frame(par), data.frame(t102), FUN = function(x, t) {

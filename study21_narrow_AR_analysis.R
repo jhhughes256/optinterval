@@ -30,7 +30,7 @@
   source(paste(git.dir, reponame, "sumstat_functions.R", sep = "/"))
 
 # Source files of interest
-  run.string <- "sigfix-AR3022"
+  run.string <- "narrow6-AR3022"
   d2b <- readRDS(paste(git.dir, reponame,
     paste0("fn_diag/d2b-", run.string, ".rds"), sep = "/"))
   d3b <- readRDS(paste(git.dir, reponame,
@@ -53,13 +53,9 @@
   for (i in 1:length(data.names)) {
     r.out <- data.frame(NULL)
     d.out <- data.frame(NULL)
-    ref.par.nexp <- ceiling(dim(get(data.names[i])[["par"]])[1]/2)
-    ref.par.m <- apply(get(data.names[i])[["par"]], 2, function(x) {
-      x[1:ceiling(length(x)/2)]
-    })
-    ref.par.c <- apply(get(data.names[i])[["par"]], 2, function(x) {
-      x[-(1:ceiling(length(x)/2))]
-    })
+    ref.par.nexp <- ceiling(length(get(data.names[i])[["par"]])/2)
+    ref.par.m <- get(data.names[i])[["par"]][1:ref.par.nexp]
+    ref.par.c <- get(data.names[i])[["par"]][-(1:ref.par.nexp)]
     fit.par.nexp <- unlist(lapply(get(data.names[i])[["fit.par"]], function(x) {
       ceiling(length(x)/2)
     }))
@@ -350,34 +346,30 @@
           rep("102", niter), rep("110", niter), rep("111", niter), rep("112", niter),
           rep("120", niter), rep("121", niter), rep("122", niter), rep("130", niter),
           rep("131", niter), rep("132", niter)),
-        ref.m1 = rep(ref.par.m[1,], 25),
-        ref.m2 = rep(ref.par.m[2,], 25),
-        ref.m3 = if (dim(ref.par.m)[1] > 2) {
-            rep(ref.par.m[3,], 25)
+        ref.m1 = rep(ref.par.m[1], 25*niter),
+        ref.m2 = rep(ref.par.m[2], 25*niter),
+        ref.m3 = if (length(ref.par.m) > 2) {
+            rep(ref.par.m[3], 25*niter)
           } else {
             NA
           },
-        ref.m4 = if (dim(ref.par.m)[1] > 3) {
-            rep(ref.par.m[4,], 25)
+        ref.m4 = if (length(ref.par.m) > 3) {
+            rep(ref.par.m[4], 25*niter)
           } else {
             NA
           },
-        ref.c1 = if (is.vector(ref.par.c)) {
-            rep(ref.par.c, 25)
-          } else {
-            rep(ref.par.c[1,], 25)
-          },
+        ref.c1 = rep(ref.par.c[1], 25*niter),
         ref.c2 = if (is.vector(ref.par.c)) {
             NA
-          } else if (dim(ref.par.c)[1] > 1) {
-            rep(ref.par.c[2,], 25)
+          } else if (length(ref.par.c) > 1) {
+            rep(ref.par.c[2], 25*niter)
           } else {
             NA
           },
         ref.c3 = if (is.vector(ref.par.c)) {
             NA
-          } else if (dim(ref.par.c)[1] > 2) {
-            rep(ref.par.c[3,], 25)
+          } else if (length(ref.par.c) > 2) {
+            rep(ref.par.c[3], 25*niter)
           } else {
             NA
           },
@@ -474,45 +466,45 @@
           get(data.names[i])[["t120"]][6,], get(data.names[i])[["t121"]][6,],
           get(data.names[i])[["t122"]][6,], get(data.names[i])[["t130"]][6,],
           get(data.names[i])[["t131"]][6,], get(data.names[i])[["t132"]][6,]),
-        time.7 = c(rep(get(data.names[i])[["tbas"]][7], niter),
-          get(data.names[i])[["t000"]][7,], get(data.names[i])[["t001"]][7,],
-          get(data.names[i])[["t002"]][7,], get(data.names[i])[["t010"]][7,],
-          get(data.names[i])[["t001"]][7,], get(data.names[i])[["t012"]][7,],
-          get(data.names[i])[["t020"]][7,], get(data.names[i])[["t021"]][7,],
-          get(data.names[i])[["t022"]][7,], get(data.names[i])[["t030"]][7,],
-          get(data.names[i])[["t031"]][7,], get(data.names[i])[["t032"]][7,],
-          get(data.names[i])[["t100"]][7,], get(data.names[i])[["t101"]][7,],
-          get(data.names[i])[["t102"]][7,], get(data.names[i])[["t110"]][7,],
-          get(data.names[i])[["t111"]][7,], get(data.names[i])[["t112"]][7,],
-          get(data.names[i])[["t120"]][7,], get(data.names[i])[["t121"]][7,],
-          get(data.names[i])[["t122"]][7,], get(data.names[i])[["t130"]][7,],
-          get(data.names[i])[["t131"]][7,], get(data.names[i])[["t132"]][7,]),
-        time.8 = c(rep(get(data.names[i])[["tbas"]][8], niter),
-          get(data.names[i])[["t000"]][8,], get(data.names[i])[["t001"]][8,],
-          get(data.names[i])[["t002"]][8,], get(data.names[i])[["t010"]][8,],
-          get(data.names[i])[["t001"]][8,], get(data.names[i])[["t012"]][8,],
-          get(data.names[i])[["t020"]][8,], get(data.names[i])[["t021"]][8,],
-          get(data.names[i])[["t022"]][8,], get(data.names[i])[["t030"]][8,],
-          get(data.names[i])[["t031"]][8,], get(data.names[i])[["t032"]][8,],
-          get(data.names[i])[["t100"]][8,], get(data.names[i])[["t101"]][8,],
-          get(data.names[i])[["t102"]][8,], get(data.names[i])[["t110"]][8,],
-          get(data.names[i])[["t111"]][8,], get(data.names[i])[["t112"]][8,],
-          get(data.names[i])[["t120"]][8,], get(data.names[i])[["t121"]][8,],
-          get(data.names[i])[["t122"]][8,], get(data.names[i])[["t130"]][8,],
-          get(data.names[i])[["t131"]][8,], get(data.names[i])[["t132"]][8,]),
-        time.9 = c(rep(get(data.names[i])[["tbas"]][9], niter),
-          get(data.names[i])[["t000"]][9,], get(data.names[i])[["t001"]][9,],
-          get(data.names[i])[["t002"]][9,], get(data.names[i])[["t010"]][9,],
-          get(data.names[i])[["t001"]][9,], get(data.names[i])[["t012"]][9,],
-          get(data.names[i])[["t020"]][9,], get(data.names[i])[["t021"]][9,],
-          get(data.names[i])[["t022"]][9,], get(data.names[i])[["t030"]][9,],
-          get(data.names[i])[["t031"]][9,], get(data.names[i])[["t032"]][9,],
-          get(data.names[i])[["t100"]][9,], get(data.names[i])[["t101"]][9,],
-          get(data.names[i])[["t102"]][9,], get(data.names[i])[["t110"]][9,],
-          get(data.names[i])[["t111"]][9,], get(data.names[i])[["t112"]][9,],
-          get(data.names[i])[["t120"]][9,], get(data.names[i])[["t121"]][9,],
-          get(data.names[i])[["t122"]][9,], get(data.names[i])[["t130"]][9,],
-          get(data.names[i])[["t131"]][9,], get(data.names[i])[["t132"]][9,]),
+        # time.7 = c(rep(get(data.names[i])[["tbas"]][7], niter),
+        #   get(data.names[i])[["t000"]][7,], get(data.names[i])[["t001"]][7,],
+        #   get(data.names[i])[["t002"]][7,], get(data.names[i])[["t010"]][7,],
+        #   get(data.names[i])[["t001"]][7,], get(data.names[i])[["t012"]][7,],
+        #   get(data.names[i])[["t020"]][7,], get(data.names[i])[["t021"]][7,],
+        #   get(data.names[i])[["t022"]][7,], get(data.names[i])[["t030"]][7,],
+        #   get(data.names[i])[["t031"]][7,], get(data.names[i])[["t032"]][7,],
+        #   get(data.names[i])[["t100"]][7,], get(data.names[i])[["t101"]][7,],
+        #   get(data.names[i])[["t102"]][7,], get(data.names[i])[["t110"]][7,],
+        #   get(data.names[i])[["t111"]][7,], get(data.names[i])[["t112"]][7,],
+        #   get(data.names[i])[["t120"]][7,], get(data.names[i])[["t121"]][7,],
+        #   get(data.names[i])[["t122"]][7,], get(data.names[i])[["t130"]][7,],
+        #   get(data.names[i])[["t131"]][7,], get(data.names[i])[["t132"]][7,]),
+        # time.8 = c(rep(get(data.names[i])[["tbas"]][8], niter),
+        #   get(data.names[i])[["t000"]][8,], get(data.names[i])[["t001"]][8,],
+        #   get(data.names[i])[["t002"]][8,], get(data.names[i])[["t010"]][8,],
+        #   get(data.names[i])[["t001"]][8,], get(data.names[i])[["t012"]][8,],
+        #   get(data.names[i])[["t020"]][8,], get(data.names[i])[["t021"]][8,],
+        #   get(data.names[i])[["t022"]][8,], get(data.names[i])[["t030"]][8,],
+        #   get(data.names[i])[["t031"]][8,], get(data.names[i])[["t032"]][8,],
+        #   get(data.names[i])[["t100"]][8,], get(data.names[i])[["t101"]][8,],
+        #   get(data.names[i])[["t102"]][8,], get(data.names[i])[["t110"]][8,],
+        #   get(data.names[i])[["t111"]][8,], get(data.names[i])[["t112"]][8,],
+        #   get(data.names[i])[["t120"]][8,], get(data.names[i])[["t121"]][8,],
+        #   get(data.names[i])[["t122"]][8,], get(data.names[i])[["t130"]][8,],
+        #   get(data.names[i])[["t131"]][8,], get(data.names[i])[["t132"]][8,]),
+        # time.9 = c(rep(get(data.names[i])[["tbas"]][9], niter),
+        #   get(data.names[i])[["t000"]][9,], get(data.names[i])[["t001"]][9,],
+        #   get(data.names[i])[["t002"]][9,], get(data.names[i])[["t010"]][9,],
+        #   get(data.names[i])[["t001"]][9,], get(data.names[i])[["t012"]][9,],
+        #   get(data.names[i])[["t020"]][9,], get(data.names[i])[["t021"]][9,],
+        #   get(data.names[i])[["t022"]][9,], get(data.names[i])[["t030"]][9,],
+        #   get(data.names[i])[["t031"]][9,], get(data.names[i])[["t032"]][9,],
+        #   get(data.names[i])[["t100"]][9,], get(data.names[i])[["t101"]][9,],
+        #   get(data.names[i])[["t102"]][9,], get(data.names[i])[["t110"]][9,],
+        #   get(data.names[i])[["t111"]][9,], get(data.names[i])[["t112"]][9,],
+        #   get(data.names[i])[["t120"]][9,], get(data.names[i])[["t121"]][9,],
+        #   get(data.names[i])[["t122"]][9,], get(data.names[i])[["t130"]][9,],
+        #   get(data.names[i])[["t131"]][9,], get(data.names[i])[["t132"]][9,]),
         tse = fit.par.tse
       )
       d.melt$prop <- with(d.melt, test/ref)
@@ -527,8 +519,7 @@
         lower <- q25 - (q75 - q25)
         upper <- q75 + (q75 - q25)
         x$outlier <- ifelse(x$prop < lower | x$prop > upper, T, F)
-        x$bioq <- ifelse(x$prop < 0.9 | x$prop > 1.1, T, F)
-        x$bioq[x$metric == "tmax"] <- ifelse(x$prop[x$metric == "tmax"] < 0.8 | x$prop[x$metric == "tmax"] > 1.2, T, F)
+        x$bioq <- ifelse(x$prop < 0.95 | x$prop > 1.05, F, T)
         x
       })
       d.out <- rbind(d.out, d.mid)
@@ -561,8 +552,8 @@
     to = log10(max(plotdata$test[plotdata$test != Inf], na.rm = T)),
     length.out = 1000
   )
-  bioqhiline <- data.frame(ref = lineofid, test = lineofid*1.25)
-  bioqloline <- data.frame(ref = lineofid, test = lineofid*0.8)
+  bioqhiline <- data.frame(ref = lineofid, test = lineofid*1.11)
+  bioqloline <- data.frame(ref = lineofid, test = lineofid*0.9)
   plotdata2 <- plotdata
   plotdata2$typef <- factor(plotdata2$type)
   levels(plotdata2$typef) <- c("otter", "otter+glam", "otter+olam",
@@ -576,7 +567,7 @@
     "otter+tmax+obst+glam", "otter+tmax+obst+olam", "basic")
   statdata <- ddply(plotdata2, .(data, metric, typef), function(x) {
     data.frame(
-      percbioq = paste0("bioq = ", signif((1 - sum(x$bioq, na.rm = T)/length(x$bioq))*100, 3), "%"),
+      percbioq = paste0("bioq = ", signif(sum(x$bioq, na.rm = T)/length(x$bioq)*100, 3), "%"),
       meanratio = paste("mean =", round(mean(x$prop), 2))
     )
   })
@@ -603,8 +594,7 @@
       x = log10(maxval)-valrange*0.29, y = log10(minval)+valrange*0.11)
     p0 <- p0 + scale_x_log10("True AUC", lim = c(minval, maxval))
     p0 <- p0 + scale_y_log10("Predicted AUC", lim = c(minval, maxval))
-    p0 <- p0 + scale_colour_manual(values = c("blue", "red"))
-    p0 <- p0 + theme(legend.position = "none")
+    p0 <- p0 + scale_colour_manual(values = c("red", "blue"))
     p0 <- p0 + facet_wrap(~typef, ncol = n.col)
     p0
   }
@@ -636,7 +626,7 @@
   levels(plotdata2$typef) <- c("otter", "otter+obst", "otter+tmax", "otter+tmax+obst", "basic")
   statdata <- ddply(plotdata2, .(data, metric, typef), function(x) {
     data.frame(
-      percbioq = paste0("bioq = ", signif((1 - sum(x$bioq, na.rm = T)/length(x$bioq))*100, 3), "%"),
+      percbioq = paste0("bioq = ", signif(sum(x$bioq, na.rm = T)/length(x$bioq)*100, 3), "%"),
       meanratio = paste("mean =", round(mean(x$prop), 2))
     )
   })
@@ -716,7 +706,6 @@
   p1 <- p1 + xlab("\nMethod")
   p1 <- p1 + scale_y_continuous("Method/Reference Ratio\n", lim = c(0, 5))
   p1 <- p1 + facet_wrap(~data, nrow = 1)
-  p1
 
   p2 <- ggplot(plotauctlast, aes(x = typef, y = prop))
   p2 <- p2 + geom_hline(yintercept = c(0.8, 1.25), color = "green4", linetype = "dashed")
@@ -727,7 +716,6 @@
   p2 <- p2 + xlab("\nMethod")
   p2 <- p2 + scale_y_continuous("Method/Reference Ratio\n", lim = c(0, 5))
   p2 <- p2 + facet_wrap(~data, nrow = 1)
-  p2
 
   p3 <- ggplot(plotaucinf, aes(x = typef, y = prop))
   p3 <- p3 + geom_hline(yintercept = c(0.8, 1.25), color = "green4", linetype = "dashed")
@@ -738,7 +726,6 @@
   p3 <- p3 + xlab("\nMethod")
   p3 <- p3 + scale_y_continuous("Method/Reference Ratio\n", lim = c(0, 5))
   p3 <- p3 + facet_wrap(~data, nrow = 1)
-  p3
 
   p4 <- ggplot(plotcmax, aes(x = typef, y = prop))
   p4 <- p4 + geom_hline(yintercept = c(0.8, 1.25), color = "green4", linetype = "dashed")
@@ -749,7 +736,6 @@
   p4 <- p4 + xlab("\nMethod")
   p4 <- p4 + scale_y_continuous("Method/Reference Ratio\n", lim = c(0, 5))
   p4 <- p4 + facet_wrap(~data, nrow = 1)
-  p4
 
   p5 <- ggplot(plottmax, aes(x = typef, y = prop))
   p5 <- p5 + geom_hline(yintercept = c(0.8, 1.25), color = "green4", linetype = "dashed")
@@ -760,7 +746,6 @@
   p5 <- p5 + xlab("\nMethod")
   p5 <- p5 + scale_y_continuous("Method/Reference Ratio\n", lim = c(0, 5))
   p5 <- p5 + facet_wrap(~data, nrow = 1)
-  p5
 
   s1 <- NULL
   s1 <- ggplot(plotauc24[plotauc24$typef %in% c("otter", "otter+obst", "otter+tmax", "otter+tmax+obst", "basic"), ], aes(x = typef, y = prop))
@@ -772,7 +757,6 @@
   s1 <- s1 + xlab("\nMethod")
   s1 <- s1 + ylab("Method/Reference Ratio\n")
   s1 <- s1 + facet_wrap(~data, nrow = 1)
-  s1
 
   s2 <- ggplot(plotauctlast[plotauctlast$typef %in% c("otter", "otter+obst", "otter+tmax", "otter+tmax+obst", "basic"), ], aes(x = typef, y = prop))
   s2 <- s2 + geom_hline(yintercept = c(0.8, 1.25), color = "green4", linetype = "dashed")
@@ -783,7 +767,6 @@
   s2 <- s2 + xlab("\nMethod")
   s2 <- s2 + ylab("Method/Reference Ratio\n")
   s2 <- s2 + facet_wrap(~data, nrow = 1)
-  s2
 
   s3 <- ggplot(plotaucinf[plotaucinf$typef %in% c("otter", "otter+obst", "otter+tmax", "otter+tmax+obst", "basic"), ], aes(x = typef, y = prop))
   s3 <- s3 + geom_hline(yintercept = c(0.8, 1.25), color = "green4", linetype = "dashed")
@@ -794,7 +777,6 @@
   s3 <- s3 + xlab("\nMethod")
   s3 <- s3 + ylab("Method/Reference Ratio\n")
   s3 <- s3 + facet_wrap(~data, nrow = 1)
-  s3
 
   s4 <- ggplot(plotcmax[plotcmax$typef %in% c("otter", "otter+obst", "otter+tmax", "otter+tmax+obst", "basic"), ], aes(x = typef, y = prop))
   s4 <- s4 + geom_hline(yintercept = c(0.8, 1.25), color = "green4", linetype = "dashed")
@@ -805,7 +787,6 @@
   s4 <- s4 + xlab("\nMethod")
   s4 <- s4 + ylab("Method/Reference Ratio\n")
   s4 <- s4 + facet_wrap(~data, nrow = 1)
-  s4
 
   s5 <- ggplot(plottmax[plottmax$typef %in% c("otter", "otter+obst", "otter+tmax", "otter+tmax+obst", "basic"), ], aes(x = typef, y = prop))
   s5 <- s5 + geom_hline(yintercept = c(0.8, 1.25), color = "green4", linetype = "dashed")
@@ -816,7 +797,7 @@
   s5 <- s5 + xlab("\nMethod")
   s5 <- s5 + ylab("Method/Reference Ratio\n")
   s5 <- s5 + facet_wrap(~data, nrow = 1)
-  s5
+
 
 # Attempt at new plots using %difference from truth
   plotdata3 <- plotdata[plotdata$type %in% c("000", "030", "bas"), ]
@@ -828,12 +809,11 @@
   })
 
   p6 <- NULL
-  p6 <- ggplot(data = plotdata3[plotdata3$metric == "aucinf" & plotdata3$data == "d1a", ])
-  p6 <- p6 + geom_line(aes(x = diffrank, y = diff*100), size = 0.8)
+  p6 <- ggplot(data = plotdata3[plotdata3$metric == "aucinf" & plotdata3$data == "d2a", ])
+  p6 <- p6 + geom_line(aes(x = diffrank, y = diff*100, colour = type), size = 0.8)
   p6 <- p6 + ggtitle("Percent Difference From Truth - AUC")
   p6 <- p6 + xlab("\nRanked PK Profiles")
   p6 <- p6 + ylab("Difference in AUC (%)\n")
-  p6 <- p6 + facet_wrap(~type, nrow = 1)
   p6
 
   p7 <- NULL
@@ -862,12 +842,11 @@
   })
 
   p8 <- NULL
-  p8 <- ggplot(data = plotdata3[plotdata3$metric == "aucinf" & plotdata3$data == "d2a", ])
+  p8 <- ggplot(data = plotdata3[plotdata3$metric == "aucinf" & plotdata3$data == "d1a", ])
   p8 <- p8 + geom_line(aes(x = diffbaserank, y = diffbase*100, colour = type), size = 0.8)
   p8 <- p8 + ggtitle("Percent Difference From Empirical - AUC")
   p8 <- p8 + xlab("\nRanked PK Profiles")
   p8 <- p8 + ylab("Difference in AUC (%)\n")
-  p8 <- p8 + facet_wrap(~type, nrow = 1)
   p8
 
   p9 <- NULL
