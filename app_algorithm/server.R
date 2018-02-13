@@ -111,7 +111,7 @@ server <- function(input, output, session) {
   Rsumexp <- reactive({
     if (rv$fit) {
       df <- rv$df
-      absorp <- as.logical(input$absorp)
+      absorp <- as.logical(as.numeric(input$absorp))
       if (absorp) df[1, 1] <- 0
       optimResult <- optim.sumexp.new(df, oral = absorp)
       best.sumexp.aic(optimResult)
@@ -122,11 +122,22 @@ server <- function(input, output, session) {
   
   RsumexpPred <- reactive({
     if (rv$fit) {
-      times <- seq(0, tail(rv$df[1], 1), length.out = 97)
+      rv$opt <- TRUE
+      times <- seq(0, tail(rv$df[,1], 1), length.out = 97)
       data.frame(
         time = times,
         conc = pred.sumexp(Rsumexp()$sumexp, times)
       )
+    } else {
+      NULL
+    }
+  })
+  
+  Rinterv <- reactive({
+    if (rv$opt) {
+      nobs <- 9   ### MAKE INTO INPUT ###
+      times <- c(0, exp(seq(log(rv$df[2,1]), log(tail(rv$df[,1], 1)), length.out = nobs-1)))
+      optim.interv.dtmax(Rsumexp()$sumexp, times)
     } else {
       NULL
     }
@@ -139,7 +150,9 @@ server <- function(input, output, session) {
     p <- NULL
     p <- ggplot()
     p <- p + geom_point(aes(x = time, y = conc), data = rv$df)
-    if (rv$fit) p <- p = geom_line(aes(x = time, y = conc), data = RsumexpPred())
+    if (rv$fit) p <- p + geom_line(aes(x = time, y = conc), data = RsumexpPred())
+    if (rv$opt) p <- p + geom_vline(xintercept = Rinterv()$times, 
+      colour = "green4", linetype = "dashed")
     p
   })  #Rplot
   
@@ -149,5 +162,17 @@ server <- function(input, output, session) {
   session$onSessionEnded(function() {
     stopApp()
   })  #endsession
+  
+# Open debug console for R session
+  observe(label = "console", {
+    if(input$console != 0) {
+      options(browserNLdisabled = TRUE)
+      # saved_console <- ".RDuetConsole"
+      # if (file.exists(saved_console)) load(saved_console)
+      isolate(browser())
+      # save(file = saved_console, list = ls(environment()))
+    }
+  })
+  
 
 }  #server
