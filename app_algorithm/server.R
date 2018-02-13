@@ -8,7 +8,7 @@ server <- function(input, output, session) {
 # io - on/off switch for processes to be used with data
 # df - reactive data.frame that saves values form the "time, conc" input
   rv <- reactiveValues(
-    n = 1, io = F,
+    n = 1, fit = FALSE, opt = FALSE,
     df = data.frame(
       time = double(1),
       conc = double(1)
@@ -20,7 +20,7 @@ server <- function(input, output, session) {
 # If values are numbers then remove default renderUI values and increase values
 # Also update dataframe for input - reference values for time, conc input
   observeEvent(input$addsamp, {
-    rv$io <- FALSE
+    rv$fit <- FALSE
     rv$n <- rv$n + 1
     rv$df <- ldply(seq_len(rv$n), function(i) {  #save current values to edit.df
       data.frame(
@@ -33,7 +33,7 @@ server <- function(input, output, session) {
 # When pressing remove: check to see if > 1 input box, if so decrease values
 # Also update dataframe for input - reference values for time,dose,conc input
   observeEvent(input$remsamp, {
-    rv$io <- FALSE
+    rv$fit <- FALSE
     if (rv$n>1) {  #
       rv$n <- rv$n - 1
     }  #if
@@ -56,8 +56,9 @@ server <- function(input, output, session) {
     })  #ldply
     rv$df$time[is.na(rv$df$time)] <- 0
     rv$df$conc[is.na(rv$df$conc)] <- 0
+    rv$fit <- TRUE
     print(rv$df)
-    rv$io <- TRUE
+    print(input$absorp)
   })  #observeEvent
 
 ## UI code for renderUI
@@ -107,16 +108,42 @@ server <- function(input, output, session) {
   output$samptimeui <- renderUI({inputBoxes()})
   
 # Reactive sumexp
-  # Rsumexp <- reactive({
-  #   
-  # })  #Rsumexp
+  Rsumexp <- reactive({
+    if (rv$fit) {
+      df <- rv$df
+      absorp <- as.logical(input$absorp)
+      if (absorp) df[1, 1] <- 0
+      optimResult <- optim.sumexp.new(df, oral = absorp)
+      best.sumexp.aic(optimResult)
+    } else {
+      NULL
+    }
+  })  #Rsumexp
+  
+  RsumexpPred <- reactive({
+    if (rv$fit) {
+      times <- seq(0, tail(rv$df[1], 1), length.out = 97)
+      data.frame(
+        time = times,
+        conc = pred.sumexp(Rsumexp()$sumexp, times)
+      )
+    } else {
+      NULL
+    }
+  })
   
 # Reactive plot
 # Shows data points when rv$io == TRUE
 # Shows sumexp curve once available
-  # Rplot <- reactive({
-  #   
-  # })  #Rplot
+  Rplot <- reactive({
+    p <- NULL
+    p <- ggplot()
+    p <- p + geom_point(aes(x = time, y = conc), data = rv$df)
+    if (rv$fit) p <- p = geom_line(aes(x = time, y = conc), data = RsumexpPred())
+    p
+  })  #Rplot
+  
+  output$plot <- renderPlot({Rplot()})
 
 # Close the R session when Chrome closes
   session$onSessionEnded(function() {

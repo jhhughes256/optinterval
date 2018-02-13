@@ -10,11 +10,12 @@ header <- dashboardHeader(
 
 ## Sidebar: Can contain tabs, can also contain inputs if desired
 # Determines how many tabs exist in the body of the ui
-sidebar <- dashboardSidebar(
-  sidebarMenu(
-    menuItem("PK Data Entry", tabName = "conc-tab", icon = icon("medkit"))  ###placeholder icon###
-  )  #sidebarMenu
-)  #dashboardSidebar
+sidebar <- dashboardSidebar(disable = TRUE)
+# sidebar <- dashboardSidebar(
+#   sidebarMenu(
+#     menuItem("PK Data Entry", tabName = "conc-tab", icon = icon("medkit"))  ###placeholder icon###
+#   )  #sidebarMenu
+# )  #dashboardSidebar
 
 ## UI Chunks
 # Chunks of ui code to be referred to in ui body to reduce clutter
@@ -31,17 +32,23 @@ uiActionButtons <- function(suffix) {
 
 ## Body: Main content of each tab, as determined by sidebar
 body <- dashboardBody(
-  tabItems(
-  ## First Tab: Times and Concentrations
-    tabItem(tabName = "conc-tab",
+  # tabItems(
+  # ## First Tab: Times and Concentrations
+  #   tabItem(tabName = "conc-tab",
       fluidRow(
-        box(status = "primary", title = "Individual or Mean-Pooled Data", width = 12,
+        box(status = "primary", title = "Individual or Mean-Pooled Data", width = 5,
+          radioButtons("absorp", "Route of Administration", inline = T,
+            choices = list("IV Bolus" = 0, "Oral Dose" = 1)
+          ),  #radioButtons
           uiOutput("samptimeui"),
           uiActionButtons("samp")
+        ),  #box
+        box(status = "primary", title = "Plot", width = 7,
+          plotOutput("plot")
         )  #box
       )  #fluidRow
-    )  #conc-tab
-  )  #tabItems
+  #   )  #conc-tab
+  # )  #tabItems
 )  #dashboardBody
 
 #ui end

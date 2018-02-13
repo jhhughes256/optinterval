@@ -6,6 +6,7 @@
 library(shiny)
 library(shinydashboard)
 library(plyr)
+library(ggplot2)
 library(GA)
 
 ## Non-reactive Objects
