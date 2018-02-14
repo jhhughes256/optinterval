@@ -216,15 +216,18 @@ optim.interv.dtmax <- function(par, times, tmax = FALSE) {
     init.par,
     err.interv.dtmax,
     method = "L-BFGS-B", hessian = T,
-    lower = tbound/48, upper = tbound/2, exp.par = par,
+    lower = tbound/(0.96*npar^2), upper = tbound/(npar/1.5), exp.par = par,
     tfirst = tfirst, tlast = tlast, a = absorp, tmax = tmax.val
   ))
   if (class(res) == "try-error") {
+    browser()
+  } else if (res$convergence == 52) {
+    init.par <- cumsum(rep(tbound/24, npar))
     res <- try(optim(
       init.par,
       err.interv.dtmax,
       method = "L-BFGS-B", hessian = T,
-      lower = tbound/48, upper = tbound/(npar/2), exp.par = par,
+      lower = tbound/(0.96*npar^2), upper = tbound/(npar/1.5), exp.par = par,
       tfirst = tfirst, tlast = tlast, a = absorp, tmax = tmax.val
     ))
   }

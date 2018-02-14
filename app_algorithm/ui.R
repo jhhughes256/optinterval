@@ -38,6 +38,7 @@ body <- dashboardBody(
       fluidRow(
         box(status = "primary", title = "Individual or Mean-Pooled Data", width = 5,
           actionButton("console","Debug Console"),
+          numericInput("nobs", "Desired Number of Observations", value = 9),
           radioButtons("absorp", "Route of Administration", inline = T,
             choices = list("IV Bolus" = 0, "Oral Dose" = 1)
           ),  #radioButtons

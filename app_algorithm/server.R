@@ -135,7 +135,7 @@ server <- function(input, output, session) {
   
   Rinterv <- reactive({
     if (rv$opt) {
-      nobs <- 9   ### MAKE INTO INPUT ###
+      nobs <- input$nobs
       times <- c(0, exp(seq(log(rv$df[2,1]), log(tail(rv$df[,1], 1)), length.out = nobs-1)))
       optim.interv.dtmax(Rsumexp()$sumexp, times)
     } else {
