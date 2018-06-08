@@ -25,32 +25,35 @@ uiActionButtons <- function(suffix) {
 		tags$head(tags$style(type = "text/css", ".MyClass {display: inline-block}")),
 		div(class = "MyClass", actionButton(paste0("rem", suffix), "Remove")),
 		tags$head(tags$style(type = "text/css", ".MyClass {display: inline-block}")),
-		div(class = "MyClass", actionButton(paste0("save", suffix), "Save")),
+		div(class = "MyClass", actionButton(paste0("save", suffix), "Optimise")),
 		tags$head(tags$style(type = "text/css", ".MyClass {display: inline-block}"))
 	)  #div
 }
 
 ## Body: Main content of each tab, as determined by sidebar
 body <- dashboardBody(
-  # tabItems(
-  # ## First Tab: Times and Concentrations
-  #   tabItem(tabName = "conc-tab",
-      fluidRow(
-        box(status = "primary", title = "Individual or Mean-Pooled Data", width = 5,
-          actionButton("console","Debug Console"),
-          numericInput("nobs", "Desired Number of Observations", value = 9),
-          radioButtons("absorp", "Route of Administration", inline = T,
-            choices = list("IV Bolus" = 0, "Oral Dose" = 1)
-          ),  #radioButtons
-          uiOutput("samptimeui"),
-          uiActionButtons("samp")
-        ),  #box
-        box(status = "primary", title = "Plot", width = 7,
-          plotOutput("plot")
-        )  #box
-      )  #fluidRow
-  #   )  #conc-tab
-  # )  #tabItems
+  column(5,
+    box(status = "primary", title = "Individual or Mean-Pooled Data", width = 12,
+      # actionButton("console","Debug Console"),
+      radioButtons("absorp", "Route of Administration", inline = T,
+        choices = list("IV Bolus" = 0, "Oral Dose" = 1)
+      ),  #radioButtons
+      numericInput("nobs", "Desired Number of Observations", value = 9),
+      checkboxGroupInput("adjunct", "Adjunct Methods", inline = T,
+        choices = list("Variable tlast" = "tlast", "Fixed tmax" = "tmax")
+      ),
+      uiOutput("samptimeui"),
+      uiActionButtons("samp")
+    )  #box
+  ), #column
+  column(7,
+    box(status = "warning", title = "Plotted Data", width = 12,
+      plotOutput("plot")
+    ),  #box
+    box(status = "success", title = "Optimised Times", width = 12,
+      uiOutput("times")
+    )  #box
+  )  #column
 )  #dashboardBody
 
 #ui end

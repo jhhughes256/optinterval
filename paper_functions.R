@@ -1,30 +1,8 @@
-# global.R script for OTTER application
-# Objects that are not reactive are written here
-# This includes static objects and functions
-# ------------------------------------------------------------------------------
-# Load package libraries
-library(shiny)
-library(shinydashboard)
-library(plyr)
-library(ggplot2)
-library(GA)
-
-## Non-reactive Objects
-# Custom ggplot theme
-  theme_bw2 <- theme_set(theme_bw(base_size = 20))
-  theme_bw2 <- theme_update(plot.margin = unit(c(1, 0.5, 3, 0.5), "lines"),
-    axis.title.x = element_text(size = 18, vjust = 0),
-    axis.title.y = element_text(size = 18, vjust = 0, angle = 90),
-    strip.text.x = element_text(size = 16),
-    strip.text.y = element_text(size = 16, angle = 90),
-    panel.grid.major.x = element_blank(),
-    panel.grid.minor.x = element_blank()
-  )  # theme_update
-
-# Warning messages
-warnmsg1 <- "Please enter values into both Time and Concentration fields"
-
-## Functions
+### Functions for the manuscript:
+# Optimising time samples for determining AUC of pharmacokinetic data using 
+# non-compartmental analysis
+# Hughes JH, Upton RN, Reuter SE, Phelps MA, Foster DJR
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 pred.sumexp <- function(par, x, d = 0) {
 # Provides predictions according to model parameters
 # par = sum of exponential parameters
@@ -65,6 +43,8 @@ order.sumexp <- function(par, n, a) {
 
 mle.sumexp <- function(par, x, y, sigma, ga = F) {
 # Determine log likelihood of given model parameters
+# This function is used within optim.sumexp and is not recommended to be used 
+# outside of that context
 # par = sum of exponential parameters
 # x = independent variable (time)
 # y = observed dependent variable (drug concentration)
@@ -132,7 +112,7 @@ pred.lambdaz <- function(dv, t) {
   bestk
 }
 
-optim.sumexp.new <- function(data, oral = F, nexp = 3) {
+optim.sumexp <- function(data, oral = F, nexp = 3) {
 # Determines best sum of exponential for given data
 # data = mean pooled data;
 #        first column independent variable;
@@ -146,8 +126,9 @@ optim.sumexp.new <- function(data, oral = F, nexp = 3) {
   x <- data[which(data[, 2] > 0 & data[, 1] != 0), 1]
   y <- data[which(data[, 2] > 0 & data[, 1] != 0), 2]
 # Estimate candidate model parameters
-  init <- pred.lambdaz(y, x)
-  for (i in 1:nexp) {
+  init <- pred.lambdaz(y, x)  # determine terminal slope for initial estimates
+  for (i in 1:nexp) {  # for each of the number of exponentials
+  # use genetic algorithms to search for good starting values for optimisation
     gares <- try(ga("real-valued",
       mle.sumexp, x = x, y = y, ga = T, sigma = 0.01,
       min = c(rep(init[2]*50, i + oral), rep(init[1]-2, i)),
@@ -159,7 +140,10 @@ optim.sumexp.new <- function(data, oral = F, nexp = 3) {
       popSize = 250,
       monitor = F
     ))
-    if (class(gares) == "try-error") browser()
+    if (class(gares) == "try-error") {
+      stop("Unsuccessful genetic algorithm optimisation: may be a bad set of random numbers please run again.")
+    }
+  # take initial parameters from genetic algorithm and use them for quasi-newton optimisation
     ga.par <- gares@solution[1, ]
     optres <- try(optim(
       ga.par,
@@ -167,7 +151,7 @@ optim.sumexp.new <- function(data, oral = F, nexp = 3) {
       method = "BFGS", hessian = T,
       x = x, y = y, sigma = 0.01
     ))
-    if (class(optres) == "try-error") {
+    if (class(optres) == "try-error") {  # if quasi-Newton fails, use genetic algorithm result
       optres <- list(
         par = gares@solution[1,],
         value = -gares@fitnessValue,
@@ -192,6 +176,9 @@ optim.sumexp.new <- function(data, oral = F, nexp = 3) {
 }
 
 best.sumexp.aic <- function(opt) {
+# Determines best sum of exponential parameters from optim.sumexp output
+# Uses Aikaike's Information Criterion to determine best set of parameters
+# opt = optim.sumexp output
   values <- unlist(opt$value)
   ofv <- values[which(names(values) == "ofv")]
   k <- unlist(lapply(opt$par, length))
@@ -200,48 +187,80 @@ best.sumexp.aic <- function(opt) {
 }
 
 tmax.sumexp <- function(par, tlast = 24, res = 0.1) {
+# Determines tmax for a set of sum of exponential parameters
+# par = sum of exponential parameters
+# tlast = final time checked for tmax (if tmax = tlast, tlast should be increased)
+# res = resolution of search for tmax (default is 0.1 time units)
   times <- seq(0, tlast, by = res)
   yhat <- pred.sumexp(par, times)
   return(times[which(yhat == max(yhat))])
 }
 
-err.interv.dtmax <- function(par, exp.par, tfirst, tlast, a = F, tmax = NULL) {
+err.interv <- function(par, exp.par, tfirst, tlast, a = F, tmax = NULL) {
+# Determines the trapezoidal error associated with a set of times for a
+# specific sum of exponential equation
+# This function is used within optim.sumexp and is not recommended to be used 
+# outside of that context
+# par = sample times for which trapezoidal error is calculated
+# exp.par = sum of exponential parameters
+# tfirst = first time for time samples (usually 0) 
+# tlast = final time for time samples
+# a = logical statement of whether exp.par is for an absorption curve
+# tmax = tmax to be fixed if using that alternate method
+# First put together times from first and last times, tmax and time intervals
   times <- c(tfirst, cumsum(par), tmax, tlast)
   times <- sort(times)
+# Calculated the change in time between times
   deltat <- diff(times)
+# Determine highest second derivative value for each interval
   if (a) {
+  # if an absorption curve then must determine whether the first or second value 
+  # is associated with the most error
     all.secd <- abs(pred.sumexp(exp.par, times, 2))
     secd <- c(NULL)
     for (i in 1:(length(times)-1)) {
       secd[i] <- all.secd[which(all.secd == max(all.secd[c(i, i + 1)]))][1]
     }
-  } else {
+  } else {  
+  # otherwise highest second derivative is always for the first time point
     secd <- pred.sumexp(exp.par, times[-length(times)], 2)
   }
+# Determine trapezoidal error
   err <- deltat^3*secd/12
   sumerr <- sqrt(mean(err^2))
   return(sumerr)
 }
 
-optim.interv.dtmax <- function(par, times, tmax = FALSE) {
+optim.interv <- function(par, times, tmax = FALSE) {
+# Determines best set of intervals to an sum of exponential equation
+# par = sum of exponential equation parameters (typically output of best.sumexp)
+# times = times to be optimised, should be the same length as the output you want
+# should also define the first and last time to be measured
+# tmax = logical statement of whether the fixed tmax alternate method should be used
+# Set up environment by defining often used objects
   tfirst <- min(times)
   tlast <- max(times)
   tbound <- tlast - tfirst
   absorp <- ifelse((length(par) %% 2) != 0, T, F)
   npar <- length(times) - (2 + tmax*absorp)
+# Calculated tmax if method is fixed tmax method is used and sum of exponentials 
+# describes an absorption curve
   if (tmax & absorp) tmax.val <- tmax.sumexp(par, tlast, tlast/720)  # maximum length of 721
   else tmax.val <- NULL
+# Set up nrep object to count number of iterations
   nrep <- 0
   repeat {
+  # create randomised initial parameters for optimisation
     init.par <- cumsum(rep(tbound/2^runif(1, 4, 6), npar))
     res <- try(optim(
       init.par,
-      err.interv.dtmax,
+      err.interv,
       method = "L-BFGS-B", hessian = T,
       lower = tbound/(0.96*npar^2), upper = tbound/(npar/1.5), exp.par = par,
       tfirst = tfirst, tlast = tlast, a = absorp, tmax = tmax.val
     ))
-    if (class(res) == "try-error") {browser()}
+    if (class(res) == "try-error") {stop("Critical error: bad seed or bad input")}
+  # if optimisation converges or has run 10 times break
     if (res$convergence == 0 | nrep == 10) break
     nrep <- nrep + 1
   }
@@ -249,7 +268,10 @@ optim.interv.dtmax <- function(par, times, tmax = FALSE) {
   return(res)
 }
 
-obs.tlast.lam <- function(obs) {
+obs.tlast <- function(obs) {
+# Determines the best tlast for a set of observed data by calculating the slope
+# of the terminal phase
+# Half-life is multiplied by 3 and rounded to the closest 12 time units
   lambz <- -pred.lambdaz(obs[, 2], obs[, 1])[2]
   hl <- log(2)/lambz
   ceiling(hl/4)*12

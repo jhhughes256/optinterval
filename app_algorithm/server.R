@@ -21,41 +21,46 @@ server <- function(input, output, session) {
 # Also update dataframe for input - reference values for time, conc input
   observeEvent(input$addsamp, {
     rv$fit <- FALSE
+    rv$opt <- FALSE
     rv$n <- rv$n + 1
-    rv$df <- ldply(seq_len(rv$n), function(i) {  #save current values to edit.df
+    df <- ldply(seq_len(rv$n), function(i) {  #save current values
       data.frame(
         time = as.numeric(get("input")[[paste0("time", i)]]),
         conc = as.numeric(get("input")[[paste0("conc", i)]])
       )  #data.frame
     })  #ldply
+    rv$df <- arrange(df, time)
   })  #observeEvent
 
 # When pressing remove: check to see if > 1 input box, if so decrease values
 # Also update dataframe for input - reference values for time,dose,conc input
   observeEvent(input$remsamp, {
     rv$fit <- FALSE
-    if (rv$n>1) {  #
+    rv$opt <- FALSE
+    if (rv$n > 1) {  
       rv$n <- rv$n - 1
     }  #if
-    rv$df <- ldply(seq_len(rv$n), function(i) {  #save current values to edit.df
+    df <- ldply(seq_len(rv$n), function(i) {  #save current values 
       data.frame(
         time = as.numeric(get("input")[[paste0("time", i)]]),
         conc = as.numeric(get("input")[[paste0("conc", i)]])
       )  #data.frame
     })  #ldply
+    rv$df <- arrange(df, time)
   })  #observeEvent
 
 # When pressing save: update dataframe for input
 # Also print to console the state of the data (for debug purposes)
   observeEvent(input$savesamp, {
-    rv$df <- ldply(seq_len(rv$n), function(i){  #save current values to edit.df
+    df <- ldply(seq_len(rv$n), function(i){  #save current values 
       data.frame(
         time = as.numeric(get("input")[[paste0("time", i)]]),
         conc = as.numeric(get("input")[[paste0("conc", i)]])
       )  #data.frame
     })  #ldply
-    rv$df$time[is.na(rv$df$time)] <- 0
-    rv$df$conc[is.na(rv$df$conc)] <- 0
+    df$time[is.na(df$time)] <- 0
+    df$conc[is.na(df$conc)] <- 0
+    rv$df <- arrange(df, time)
     rv$fit <- TRUE
     print(rv$df)
     print(input$absorp)
@@ -89,7 +94,7 @@ server <- function(input, output, session) {
           div(class = "MyClass",
             textInput(
               paste0("conc", i),
-              ifelse(i == 1, "Concentrations", NA),
+              ifelse(i == 1, "Concentration", NA),
               df[i, 2]
             )  #textInput
           ),  #input$conc-i
@@ -131,17 +136,24 @@ server <- function(input, output, session) {
     } else {
       NULL
     }
-  })
+  })  #RsumexpPred
   
   Rinterv <- reactive({
+    tmaxStatus <- F
+    tlastStatus <- F
+    if (!is.null(input$adjunct)) {
+      if (input$adjunct %in% "tmax") tmaxStatus <- T
+      if (input$adjunct %in% "tlast") tlastStatus <- T
+    }
     if (rv$opt) {
       nobs <- input$nobs
-      times <- c(0, exp(seq(log(rv$df[2,1]), log(tail(rv$df[,1], 1)), length.out = nobs-1)))
-      optim.interv.dtmax(Rsumexp()$sumexp, times)
+      tlast <- ifelse(tlastStatus, obs.tlast.lam(rv$df), tail(rv$df[,1], 1))
+      times <- seq(0, tlast, length.out = nobs)
+      optim.interv.dtmax(Rsumexp()$sumexp, times, tmax = tmaxStatus)
     } else {
       NULL
     }
-  })
+  })  #Rinterv
   
 # Reactive plot
 # Shows data points when rv$io == TRUE
@@ -149,14 +161,27 @@ server <- function(input, output, session) {
   Rplot <- reactive({
     p <- NULL
     p <- ggplot()
-    p <- p + geom_point(aes(x = time, y = conc), data = rv$df)
+    p <- p + geom_point(aes(x = time, y = conc), data = rv$df, na.rm = TRUE)
     if (rv$fit) p <- p + geom_line(aes(x = time, y = conc), data = RsumexpPred())
     if (rv$opt) p <- p + geom_vline(xintercept = Rinterv()$times, 
       colour = "green4", linetype = "dashed")
+    p <- p + xlab("Time")
+    p <- p + ylab("Concentration")
     p
   })  #Rplot
   
   output$plot <- renderPlot({Rplot()})
+
+# Reactive text
+  output$times <- renderUI({
+    cssStyle <- paste0("color:green; text-align: center; font-size:", 26/input$nobs, "vw")
+    if (rv$opt) {
+      timeString <- paste(round(Rinterv()$times/0.5, 0)*0.5, collapse = ", ")
+      div(timeString, style = cssStyle)
+    } else {
+      div("Waiting...", style = cssStyle)
+    }
+  })  #output$times
 
 # Close the R session when Chrome closes
   session$onSessionEnded(function() {
@@ -164,15 +189,14 @@ server <- function(input, output, session) {
   })  #endsession
   
 # Open debug console for R session
-  observe(label = "console", {
-    if(input$console != 0) {
-      options(browserNLdisabled = TRUE)
-      # saved_console <- ".RDuetConsole"
-      # if (file.exists(saved_console)) load(saved_console)
-      isolate(browser())
-      # save(file = saved_console, list = ls(environment()))
-    }
-  })
+  # observe(label = "console", {
+  #   if(input$console != 0) {
+  #     options(browserNLdisabled = TRUE)
+  #     # saved_console <- ".RDuetConsole"
+  #     # if (file.exists(saved_console)) load(saved_console)
+  #     isolate(browser())
+  #     # save(file = saved_console, list = ls(environment()))
+  #   }
+  # })
   
-
 }  #server

@@ -90,7 +90,7 @@
       a1 <- (x - K[j])/(K[j+n] - K[j]) * Bfun(x, j, n-1, K)
     }
     if(n==0) {
-      b <- ((x > K[j]) & (x <= K[j+1]))*1  # this is described in line 52, uses the TRUE or FALSE statement gained by determining t[j] <= t <= t[j+1]
+      b <- ((x > K[j]) & (x <= K[j+1]))*1  # this is described in line 59, uses the TRUE or FALSE statement gained by determining t[j] <= t <= t[j+1]
     }
     if(n>0) {
       b <- a1 + a2
@@ -110,7 +110,7 @@
 #  So, for instance, for splines of degree 1, we have
   u <- seq(0, 1, by = 0.01)
   plot(u, Bfun(u, 1, 1, c(0, 0.4, 1, 1)),
-		lwd = 2, col = "red", type = "l", ylim = c(0, 1))
+    lwd = 2, col = "red", type = "l", ylim = c(0, 1))
   lines(u, Bfun(u, 2, 1, c(0, 0.4, 1, 1)), lwd = 2, col = "blue")
   abline(v = c(0, 0.4, 1), lty = 2)
 
@@ -119,7 +119,7 @@
 #  and for splines of degree 2, the basis is
   u <- seq(0, 1, by = 0.01)
   plot(u, Bfun(u, 1, 2, c(0 ,0, 0.4, 1, 1, 1)),
-		lwd = 2, col = "red", type = "l", ylim = c(0, 1))
+    lwd = 2, col = "red", type = "l", ylim = c(0, 1))
   lines(u, Bfun(u, 2, 2, c(0, 0, 0.4, 1, 1, 1)), lwd = 2, col = "blue")
   lines(u, Bfun(u, 3, 2, c(0, 0, 0.4, 1, 1, 1)), lwd = 2, col = "green")
   abline(v = c(0, 0.4, 1), lty = 2)
@@ -133,15 +133,15 @@
 # 2. We consider Yhat[i] = Bhat[0] + Bhat[1]b[1,1](X[i]) + Bhat[2]b[2,1](X[i])
 
 # Here, based on the graph above (with the basis function), note that we can use
-	plot(cars)
+  plot(cars)
   u0 <- seq(0, 1, by = 0.01)
   v <- reg$coefficients[2]*u0 + reg$coefficients[1]
   x1 <- seq(min(cars$speed), K, length = length(u0))
   lines(x1, v, col = "green", lwd = 2)
   u0 <- seq(0, 1, by = 0.01)
   v <- (reg$coefficients[3] - reg$coefficients[2])*u0 +
-		reg$coefficients[1] +
-		reg$coefficients[2]
+    reg$coefficients[1] +
+    reg$coefficients[2]
   x2 <- seq(K, max(cars$speed), length = length(u0))
   lines(x2, v, col = "blue", lwd = 2)
 #	which gives us exactly the graph we obtained previously.
@@ -154,7 +154,7 @@
     reg$coefficients[2]*Bfun(u0, 1, 1, c(0, k, 1, 1)) +
     reg$coefficients[3]*Bfun(u0, 2, 1, c(0, k, 1, 1))
   lines(x = min(cars$speed) + u0*(max(cars$speed) - min(cars$speed)), y = v,
-	 	col = "purple", lwd = 2)
+     col = "purple", lwd = 2)
   abline(v = K, lty = 2, col = "red")
 
 # So, we should be able to try with two knots (but we keep it linear, so far)
@@ -169,7 +169,7 @@
 # First, we can plot our basis functions, with two knots,
   u <- seq(0, 1, by = 0.01)
   plot(u, Bfun(u, 1, 1, c(0, 0.4, 0.7, 1)),
-		lwd = 2, col = "red", type = "l", ylim = c(0, 1))
+    lwd = 2, col = "red", type = "l", ylim = c(0, 1))
   lines(u, Bfun(u, 2, 1, c(0, 0.4, 0.7, 1, 1)), lwd = 2, col = "blue")
   lines(u, Bfun(u, 3, 1, c(0, 0.4, 0.7, 1, 1)), lwd = 2, col = "green")
   abline(v = c(0, 0.4, 0.7, 1), lty = 2)
@@ -184,14 +184,14 @@
     reg$coefficients[3]*Bfun(u0, 2, 1, c(0, k, 1, 1)) +
     reg$coefficients[4]*Bfun(u0, 3, 1, c(0, k, 1, 1))
   lines(x = min(cars$speed)+u0*(max(cars$speed)-min(cars$speed)), y = v,
-		col = "red", lwd = 2)
+    col = "red", lwd = 2)
   abline(v = K, lty = 2, col = "red")
 
 # Great, it looks promising…. Let us look finally at the case we have two knots,
 # and some quadratic splines. Here, with two knots, the basis is
   u <- seq(0, 1, by = 0.01)
   plot(u, Bfun(u, 1, 2, c(0, 0, 0.4, 0.7, 1, 1, 1)),
-		lwd = 2, col = "red", type = "l", ylim = c(0, 1))
+    lwd = 2, col = "red", type = "l", ylim = c(0, 1))
   lines(u, Bfun(u, 2, 2, c(0, 0, 0.4, 0.7, 1, 1, 1)), lwd = 2, col = "blue")
   lines(u, Bfun(u, 3, 2, c(0, 0, 0.4, 0.7, 1, 1, 1)), lwd = 2, col = "green")
   lines(u, Bfun(u, 4, 2, c(0, 0, 0.4, 0.7, 1, 1, 1)), lwd = 2, col = "orange")
@@ -208,7 +208,7 @@
     reg$coefficients[4]*Bfun(u0, 3, 2, c(0, 0, k, 1, 1, 1)) +
     reg$coefficients[5]*Bfun(u0, 4, 2, c(0, 0, k, 1, 1, 1))
   lines(x = min(cars$speed) + u0*(max(cars$speed) - min(cars$speed)), y = v,
-	  col = "purple", lwd = 2)
+    col = "purple", lwd = 2)
   abline(v = K, lty = 2, col = "red")
 
 # And just one final comment: how do I optimally
