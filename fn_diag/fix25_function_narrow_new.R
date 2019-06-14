@@ -713,14 +713,14 @@
       data = data.names[i],
       result = study.fn(get(data.names[i]),
         par = get(par.names[i]), fn = get(fn.names[i]),
-        t0 = get(t0.names[i]), nobs = 6
+        t0 = get(t0.names[i]), nobs = 12
       )  # study.fn
     )  # list
     print(paste0(i, "done"))
   }  # for loop
   setwd("E:/Hughes/Git/splines/fn_diag")
-  saveRDS(fin.res[[1]]$result, "d2b-varnobs6-AR3024.rds")
-  saveRDS(fin.res[[2]]$result, "d3b-varnobs6-AR3024.rds")
-  saveRDS(fin.res[[3]]$result, "d1a-varnobs6-AR3024.rds")
-  saveRDS(fin.res[[4]]$result, "d2a-varnobs6-AR3024.rds")
-  saveRDS(fin.res[[5]]$result, "d3a-varnobs6-AR3024.rds")
+  saveRDS(fin.res[[1]]$result, "d2b-newnobs12-AR3024.rds")
+  saveRDS(fin.res[[2]]$result, "d3b-newnobs12-AR3024.rds")
+  saveRDS(fin.res[[3]]$result, "d1a-newnobs12-AR3024.rds")
+  saveRDS(fin.res[[4]]$result, "d2a-newnobs12-AR3024.rds")
+  saveRDS(fin.res[[5]]$result, "d3a-newnobs12-AR3024.rds")

@@ -31,7 +31,7 @@
   source(paste(git.dir, reponame, "sumstat_functions.R", sep = "/"))
 
 # Source files of interest
-  run.string <- "sigfix-AR3024"
+  run.string <- "broadnewdt2-AR3024"
   d2b <- readRDS(paste(git.dir, reponame,
     paste0("fn_diag/d2b-", run.string, ".rds"), sep = "/"))
   d3b <- readRDS(paste(git.dir, reponame,
@@ -551,9 +551,9 @@
   bioqloline <- data.frame(ref = lineofid, test = lineofid*0.8)
   bioqhiline2 <- data.frame(ref = lineofid, test = lineofid*1.1)
   bioqloline2 <- data.frame(ref = lineofid, test = lineofid*0.9)
-  plotdata2 <- plotdata[plotdata$type %in% c("030", "bas"),]
+  plotdata2 <- plotdata[plotdata$type %in% c("000", "030"),]
   plotdata2$typef <- factor(plotdata2$type)
-  levels(plotdata2$typef) <- c("Algorithm", "Empirical")
+  levels(plotdata2$typef) <- c("Base", "Adjunct")
   statdata <- ddply(plotdata2, .(data, metric, typef), function(x) {
     data.frame(
       percbioq = paste0("bioq = ", signif(sum(x$bioq, na.rm = T)/length(x$bioq)*100, 3), "%"),
@@ -598,22 +598,22 @@
     p0
   }
 
-  truevpred.plot("d3a", "aucinf", 2)
-  ggsave("truevpred_paganz.png", width = 23.2, height = 11.2, units = "cm")
-
-  theme_update(axis.text.x = element_text(angle = 335))
-
-  p1 <- truevpred.plot("d2b", "aucinf", 2, c(10, 100, 1000, 10000))
-  p2 <- truevpred.plot("d3b", "aucinf", 2, c(10, 1000, 100000))
-  p3 <- truevpred.plot("d3a", "aucinf", 2, c(3, 300, 30000))
-  p4 <- truevpred.plot("d3a", "cmax", 2, c(1, 10, 100))
-  p5 <- truevpred.plot("d3a", "tmax", 2, c(1, 3, 10))
-
-  plot_grid(p3, p4, p5, p2, ncol = 3, label_fontface = "plain")
-  ggsave("truevpred_paganz_cow_adj.png", width = 24.2, height = 12.2, units = "cm")
-
-  theme_bw2 <- theme_set(theme_bw(base_size = 14))
-  theme_update(plot.title = element_text(hjust = 0.5))
+  # truevpred.plot("d3a", "aucinf", 2)
+  # ggsave("truevpred_paganz.png", width = 23.2, height = 11.2, units = "cm")
+  #
+  # theme_update(axis.text.x = element_text(angle = 335))
+  #
+  # p1 <- truevpred.plot("d2b", "aucinf", 2, c(10, 100, 1000, 10000))
+  # p2 <- truevpred.plot("d3b", "aucinf", 2, c(10, 1000, 100000))
+  # p3 <- truevpred.plot("d3a", "aucinf", 2, c(3, 300, 30000))
+  # p4 <- truevpred.plot("d3a", "cmax", 2, c(1, 10, 100))
+  # p5 <- truevpred.plot("d3a", "tmax", 2, c(1, 3, 10))
+  #
+  # plot_grid(p3, p4, p5, p2, ncol = 3, label_fontface = "plain")
+  # ggsave("truevpred_paganz_cow_adj.png", width = 24.2, height = 12.2, units = "cm")
+  #
+  # theme_bw2 <- theme_set(theme_bw(base_size = 14))
+  # theme_update(plot.title = element_text(hjust = 0.5))
 
   plotdata2$dataf <- factor(plotdata2$data)
   levels(plotdata2$dataf) <- c("2-comp bolus", "3-comp bolus", "1-comp w/ abs", "2-comp w/ abs", "3-comp w/ abs")
@@ -642,7 +642,7 @@
   p7 <- p7 + xlab("\nMethod")
   p7 <- p7 + scale_y_continuous("Method/Reference AUC Ratio\n", breaks = c(0.5, 0.6, 0.7, 0.8, 0.9, 1, 1.1, 1.2))
   p7 <- p7 + facet_wrap(~dataf, nrow = 1)
-  p7 + coord_cartesian(ylim = c(0.45, 1.2))
+  p7 + coord_cartesian(ylim = c(0.55, 1.15))
 
 
   ggsave("boxplot_paganz_adj.png", width = 23.2, height = 11.2, units = "cm")

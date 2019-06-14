@@ -30,7 +30,7 @@
   source(paste(git.dir, reponame, "sumstat_functions.R", sep = "/"))
 
 # Source files of interest
-  run.string <- "narrow6-AR3022"
+  run.string <- "newnobs12-AR3024"
   d2b <- readRDS(paste(git.dir, reponame,
     paste0("fn_diag/d2b-", run.string, ".rds"), sep = "/"))
   d3b <- readRDS(paste(git.dir, reponame,
@@ -505,6 +505,45 @@
         #   get(data.names[i])[["t120"]][9,], get(data.names[i])[["t121"]][9,],
         #   get(data.names[i])[["t122"]][9,], get(data.names[i])[["t130"]][9,],
         #   get(data.names[i])[["t131"]][9,], get(data.names[i])[["t132"]][9,]),
+        # time.10 = c(rep(get(data.names[i])[["tbas"]][10], niter),
+        #   get(data.names[i])[["t000"]][10,], get(data.names[i])[["t001"]][10,],
+        #   get(data.names[i])[["t002"]][10,], get(data.names[i])[["t010"]][10,],
+        #   get(data.names[i])[["t001"]][10,], get(data.names[i])[["t012"]][10,],
+        #   get(data.names[i])[["t020"]][10,], get(data.names[i])[["t021"]][10,],
+        #   get(data.names[i])[["t022"]][10,], get(data.names[i])[["t030"]][10,],
+        #   get(data.names[i])[["t031"]][10,], get(data.names[i])[["t032"]][10,],
+        #   get(data.names[i])[["t100"]][10,], get(data.names[i])[["t101"]][10,],
+        #   get(data.names[i])[["t102"]][10,], get(data.names[i])[["t110"]][10,],
+        #   get(data.names[i])[["t111"]][10,], get(data.names[i])[["t112"]][10,],
+        #   get(data.names[i])[["t120"]][10,], get(data.names[i])[["t121"]][10,],
+        #   get(data.names[i])[["t122"]][10,], get(data.names[i])[["t130"]][10,],
+        #   get(data.names[i])[["t131"]][10,], get(data.names[i])[["t132"]][10,]),
+        # time.11 = c(rep(get(data.names[i])[["tbas"]][11], niter),
+        #   get(data.names[i])[["t000"]][11,], get(data.names[i])[["t001"]][11,],
+        #   get(data.names[i])[["t002"]][11,], get(data.names[i])[["t010"]][11,],
+        #   get(data.names[i])[["t001"]][11,], get(data.names[i])[["t012"]][11,],
+        #   get(data.names[i])[["t020"]][11,], get(data.names[i])[["t021"]][11,],
+        #   get(data.names[i])[["t022"]][11,], get(data.names[i])[["t030"]][11,],
+        #   get(data.names[i])[["t031"]][11,], get(data.names[i])[["t032"]][11,],
+        #   get(data.names[i])[["t100"]][11,], get(data.names[i])[["t101"]][11,],
+        #   get(data.names[i])[["t102"]][11,], get(data.names[i])[["t110"]][11,],
+        #   get(data.names[i])[["t111"]][11,], get(data.names[i])[["t112"]][11,],
+        #   get(data.names[i])[["t120"]][11,], get(data.names[i])[["t121"]][11,],
+        #   get(data.names[i])[["t122"]][11,], get(data.names[i])[["t130"]][11,],
+        #   get(data.names[i])[["t131"]][11,], get(data.names[i])[["t132"]][11,]),
+        # time.12 = c(rep(get(data.names[i])[["tbas"]][12], niter),
+        #   get(data.names[i])[["t000"]][12,], get(data.names[i])[["t001"]][12,],
+        #   get(data.names[i])[["t002"]][12,], get(data.names[i])[["t010"]][12,],
+        #   get(data.names[i])[["t001"]][12,], get(data.names[i])[["t012"]][12,],
+        #   get(data.names[i])[["t020"]][12,], get(data.names[i])[["t021"]][12,],
+        #   get(data.names[i])[["t022"]][12,], get(data.names[i])[["t030"]][12,],
+        #   get(data.names[i])[["t031"]][12,], get(data.names[i])[["t032"]][12,],
+        #   get(data.names[i])[["t100"]][12,], get(data.names[i])[["t101"]][12,],
+        #   get(data.names[i])[["t102"]][12,], get(data.names[i])[["t110"]][12,],
+        #   get(data.names[i])[["t111"]][12,], get(data.names[i])[["t112"]][12,],
+        #   get(data.names[i])[["t120"]][12,], get(data.names[i])[["t121"]][12,],
+        #   get(data.names[i])[["t122"]][12,], get(data.names[i])[["t130"]][12,],
+        #   get(data.names[i])[["t131"]][12,], get(data.names[i])[["t132"]][12,]),
         tse = fit.par.tse
       )
       d.melt$prop <- with(d.melt, test/ref)
@@ -543,6 +582,8 @@
       n = length(na.omit(prop))
     )
   })
+  subout <- broad.out[broad.out$metric %in% c("aucinf", "cmax", "tmax") & broad.out$type %in% c("000"),]
+  subout <- subout[!(subout$metric %in% c("cmax", "tmax") & subout$data %in% c("d2b", "d3b")),]
   # write.csv(broad.out, "broad-output.csv")
 
 # True vs. Pred
@@ -831,7 +872,7 @@
     x.metric <- unique(x$metric)
     x.data <- unique(x$data)
     bassub <- basdata[basdata$metric == x.metric & basdata$data == x.data, ]
-    x$diffbase <- bassub$diff - x$diff
+    x$diffbase <- x$diff - bassub$diff
     x$diffbaserank <- rank(x$diffbase, ties.method = "first")/1000
     if (unique(x$type) == "bas") {
       x$diffbasemed <- NA

@@ -30,7 +30,7 @@
   source(paste(git.dir, reponame, "sumstat_functions.R", sep = "/"))
 
 # Source files of interest
-  run.string <- "sigfix-AR3022"
+  run.string <- "broadnewdt2-AR3024"
   d2b <- readRDS(paste(git.dir, reponame,
     paste0("fn_diag/d2b-", run.string, ".rds"), sep = "/"))
   d3b <- readRDS(paste(git.dir, reponame,
@@ -552,6 +552,9 @@
       n = length(na.omit(prop))
     )
   })
+  subout <- broad.out[broad.out$metric %in% c("aucinf", "cmax", "tmax") & broad.out$type %in% c("bas", "030", "130"),]
+  subout <- subout[!(subout$metric %in% c("cmax", "tmax") & subout$data %in% c("d2b", "d3b")),]
+  plotdata[plotdata$metric == "aucinf" & plotdata$type %in% c("000"),]
   # write.csv(broad.out, "broad-output.csv")
 
 # True vs. Pred
@@ -785,7 +788,7 @@
   s2 <- s2 + facet_wrap(~data, nrow = 1)
   s2
 
-  s3 <- ggplot(plotaucinf[plotaucinf$typef %in% c("otter", "otter+obst", "otter+tmax", "otter+tmax+obst", "basic"), ], aes(x = typef, y = prop))
+  s3 <- ggplot(plotaucinf[plotaucinf$typef %in% c("otter", "basic"), ], aes(x = typef, y = prop))
   s3 <- s3 + geom_hline(yintercept = c(0.8, 1.25), color = "green4", linetype = "dashed")
   s3 <- s3 + geom_hline(yintercept = 1, color = "red", linetype = "dashed")
   # s3 <- s3 + geom_boxplot(aes(ymin = CI90lo, ymax = CI90hi))
@@ -819,7 +822,7 @@
   s5
 
 # Attempt at new plots using %difference from truth
-  plotdata3 <- plotdata[plotdata$type %in% c("000", "030", "bas"), ]
+  plotdata3 <- plotdata[plotdata$type %in% c("030", "bas"), ]
   plotdata3$diff <- abs(1 - plotdata3$prop)
   plotdata3 <- ddply(plotdata3, .(type, metric, data), function(x) {
     x$diffrank <- rank(x$diff, ties.method = "first")/1000
@@ -851,15 +854,19 @@
     x.metric <- unique(x$metric)
     x.data <- unique(x$data)
     bassub <- basdata[basdata$metric == x.metric & basdata$data == x.data, ]
-    x$diffbase <- bassub$diff - x$diff
+    x$diffbase <- x$diff - bassub$diff
     x$diffbaserank <- rank(x$diffbase, ties.method = "first")/1000
     if (unique(x$type) == "bas") {
       x$diffbasemed <- NA
+      x$percbetter <- NA
     } else {
       x$diffbasemed <- x$diffbaserank[which(abs(x$diffbase) == min(abs(x$diffbase), na.rm = T))][1]
+      x$areabetter <- -sum(x$diffbase[x$diffbase < 0], na.rm = T)
+      x$areaworse <- sum(x$diffbase[x$diffbase > 0], na.rm = T)
     }
     x
   })
+  # View(plotdata3[plotdata3$data == "d1a" & plotdata3$metric == "aucinf" & plotdata3$type == "030",])
 
   p8 <- NULL
   p8 <- ggplot(data = plotdata3[plotdata3$metric == "aucinf" & plotdata3$data == "d2a", ])

@@ -620,6 +620,7 @@
   }
 
   err.interv.dtmax <- function(par, exp.par, tfirst, tlast, a = F, tmax = NULL) {
+    c
     times <- c(tfirst, cumsum(par), tmax, tlast)
     times <- sort(times)
     deltat <- diff(times)
@@ -632,8 +633,10 @@
     } else {
       secd <- pred.sumexp(exp.par, times[-length(times)], 2)
     }
+    c
     err <- deltat^3*secd/12
     sumerr <- sqrt(mean(err^2))
+    sumerr
     return(sumerr)
   }
 
@@ -681,24 +684,21 @@
     tbound <- tlast - tfirst
     absorp <- ifelse((length(par) %% 2) != 0, T, F)
     npar <- length(times) - (2 + tmax*absorp)
-    init.par <- cumsum(rep(tbound/48, npar))
     if (tmax & absorp) tmax.val <- tmax.sumexp(par, tlast, tlast/720)  # maximum length of 721
     else tmax.val <- NULL
-    res <- try(optim(
-      init.par,
-      err.interv.dtmax,
-      method = "L-BFGS-B", hessian = T,
-      lower = tbound/48, upper = tbound/2, exp.par = par,
-      tfirst = tfirst, tlast = tlast, a = absorp, tmax = tmax.val
-    ))
-    if (class(res) == "try-error") {
+    nrep <- 0
+    repeat {
+      init.par <- cumsum(rep(tbound/2^runif(1, 4, 6), npar))
       res <- try(optim(
         init.par,
         err.interv.dtmax,
         method = "L-BFGS-B", hessian = T,
-        lower = tbound/48, upper = tbound/(npar/2), exp.par = par,
+        lower = tbound/(0.96*npar^2), upper = tbound/(npar/1.5), exp.par = par,
         tfirst = tfirst, tlast = tlast, a = absorp, tmax = tmax.val
       ))
+      if (class(res) == "try-error") {browser()}
+      if (res$convergence == 0 | nrep == 10) break
+      nrep <- nrep + 1
     }
     res$times <- sort(c(cumsum(c(tfirst, res$par)), tmax.val, tlast))
     return(res)
@@ -799,6 +799,55 @@
       }
       flag <- flag + 1
     }
+    return(res)
+  }
+
+  err.interv.linlog <- function(par, exp.par, tfirst, tlast, a = F, tmax) {
+    times <- c(tfirst, cumsum(par), tmax, tlast)
+    times <- sort(times)
+    deltat <- diff(times)
+    if (a) {
+      zerd <- pred.sumexp(exp.par, times)
+      fird <- pred.sumexp(exp.par, times, 1)
+      lin.secd <- pred.sumexp(exp.par, times, 2)
+      log.secd <- abs((lin.secd*fird - fird^2)*fird/zerd^2)
+      wmax <- which(zerd == max(zerd))
+      all.secd <- c(head(lin.secd, wmax), tail(log.secd, length(times) - wmax))
+      secd <- c(NULL)
+      for (i in 1:(length(times)-1)) {
+        secd[i] <- all.secd[which(all.secd == max(all.secd[c(i, i + 1)]))][1]
+      }
+    } else {
+      secd <- pred.sumexp(exp.par, times[-length(times)], 2)
+    }
+    err <- deltat^3*secd/12
+    sumerr <- mean(err^2)
+    return(sumerr)
+  }
+
+  optim.interv.linlog <- function(par, times, tmax = FALSE) {
+    tfirst <- min(times)
+    tlast <- max(times)
+    tbound <- tlast - tfirst
+    absorp <- ifelse((length(par) %% 2) != 0, T, F)
+    npar <- length(times) - (2 + tmax*absorp)
+    if (tmax & absorp) tmax.val <- tmax.sumexp(par, tlast, tlast/720)  # maximum length of 721
+    else tmax.val <- NULL
+    nrep <- 0
+    repeat {
+      init.par <- cumsum(rep(tbound/2^runif(1, 4, 6), npar))
+      res <- try(optim(
+        init.par,
+        err.interv.linlog,
+        method = "L-BFGS-B", hessian = T,
+        lower = tbound/(0.96*npar^2), upper = tbound/(npar/1.5), exp.par = par,
+        tfirst = tfirst, tlast = tlast, a = absorp, tmax = tmax.val,
+      ))
+      if (class(res) == "try-error") {browser()}
+      if (res$convergence == 0 | nrep == 10) break
+      nrep <- nrep + 1
+    }
+    res$times <- sort(c(cumsum(c(tfirst, res$par)), tmax.val, tlast))
     return(res)
   }
 

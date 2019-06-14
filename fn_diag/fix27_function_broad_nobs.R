@@ -19,7 +19,6 @@
     }
     rm("wd")
   }
-  start_time <- Sys.time()
 
 # Load packages
   library(GA)
@@ -29,10 +28,9 @@
   #theme_update(plot.title = element_text(hjust = 0.5))
 
 # Source scripts to set up environment
-  # set.seed(256256)
-  set.seed(1337)
+  set.seed(256256)
   niter <- 1000
-  sdev <- 1
+  sdev <- 4
   source(paste(git.dir, reponame, "fn_diag/fix_functions.R", sep = "/"))
   source(paste(git.dir, reponame, "fn_diag/study_rdata_resamp.R", sep = "/"))
 
@@ -85,12 +83,12 @@
   # a - fixed tmax (0 - off, 1 - on)
   # b - variable tlast (0 - off, 1 - 80% auc, 2 - three half-lives, 3 - three half-lives using observed data)
   # c - optimal lambdaz (0 - off, 1 - geomean, 2 - optimise)
-
+    t2 <- c(0, exp(seq(log(t1[2]), log(tail(t1, 1)), length.out = nobs-1)))
     t000.res <- lapply(fit.par, FUN = function(x) {
-      optim.interv.dtmax(x, t1)
+      optim.interv.dtmax(x, t2)
     })
     t001.res <- lapply(fit.par, FUN = function(x) {
-      optim.interv.dtmax(x, t1[-(nobs-1)])$times
+      optim.interv.dtmax(x, t2[-(nobs-1)])$times
     })
     t010.res <- mapply(fit.par, auc.tlast, SIMPLIFY = F, FUN = function(x, t) {
       optim.interv.dtmax(x, t)
@@ -111,10 +109,10 @@
       optim.interv.dtmax(x, t[-(nobs-1)])$times
     })
     t100.res <- lapply(fit.par, FUN = function(x) {
-      optim.interv.dtmax(x, t1, tmax = T)
+      optim.interv.dtmax(x, t2, tmax = T)
     })
     t101.res <- lapply(fit.par, FUN = function(x) {
-      optim.interv.dtmax(x, t1[-(nobs-1)], tmax = T)$times
+      optim.interv.dtmax(x, t2[-(nobs-1)], tmax = T)$times
     })
     t110.res <- mapply(fit.par, auc.tlast, SIMPLIFY = F, FUN = function(x, t) {
       optim.interv.dtmax(x, t, tmax = T)
@@ -863,13 +861,11 @@
       data = data.names[i],
       result = study.fn(get(data.names[i]),
         par = get(par.names[i]), fn = get(fn.names[i]),
-        t1 = get(t1.names[i]), nobs = 9
+        t1 = get(t1.names[i]), nobs = 7
       )  # study.fn
     )  # list
     print(paste0(i, "done"))
   }  # for loop
-  end_time <- Sys.time()
-  end_time - start_time
   # Runs
   # ARabcd
   # a - max number of exponentials (2, 3)
@@ -877,11 +873,11 @@
   # c - ofv comparitive criterion (1 - lrt, 2 - aic, 3 - bic)
   # d - error model (1 - loprop, 2- hiprop, 3 - loboth, 4- hiboth)
   setwd("E:/Hughes/Git/splines/fn_diag")
-  saveRDS(fin.res[[1]]$result, "d2b-broadnewdt2-AR3021.rds")
-  saveRDS(fin.res[[2]]$result, "d3b-broadnewdt2-AR3021.rds")
-  saveRDS(fin.res[[3]]$result, "d1a-broadnewdt2-AR3021.rds")
-  saveRDS(fin.res[[4]]$result, "d2a-broadnewdt2-AR3021.rds")
-  saveRDS(fin.res[[5]]$result, "d3a-broadnewdt2-AR3021.rds")
+  saveRDS(fin.res[[1]]$result, "d2b-broadnobs7-AR3024.rds")
+  saveRDS(fin.res[[2]]$result, "d3b-broadnobs7-AR3024.rds")
+  saveRDS(fin.res[[3]]$result, "d1a-broadnobs7-AR3024.rds")
+  saveRDS(fin.res[[4]]$result, "d2a-broadnobs7-AR3024.rds")
+  saveRDS(fin.res[[5]]$result, "d3a-broadnobs7-AR3024.rds")
 
   # source(paste(git.dir, reponame, "study_functions.R", sep = "/"))
   # fin.res <- list(NULL)
