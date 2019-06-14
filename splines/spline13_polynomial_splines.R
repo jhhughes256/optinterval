@@ -1,3 +1,5 @@
+# Same idea as spline11... but we are going to try to work out how to use the
+# coefficients gained from fitting a spline using linear regression
 # Remove all current objects in the workspace
   rm(list = ls(all = TRUE))
   set.seed(123)
@@ -6,24 +8,36 @@
   library(splines)
   K <- c(14)  # knots
   plot(cars)
-  reg <- lm(dist ~ bs(speed, knots = c(K), degree = 1), data = cars)
+  reglin <- lm(dist ~ bs(speed, knots = c(K), degree = 1), data = cars)
+  u <- seq(4, 25, by = 0.1)  # test model at these speeds
+  B <- data.frame(speed = u)  # data.frame(speeds)
+  Y <- predict(reglin, newdata = B)  # predicted dist for the desired speeds
+  lines(u, Y, lwd = 2, col = "red")
+
+# We can then do this again with a second degree spline!
+  library(splines)
+  K <- c(14)  # knots
+  plot(cars)
+  reg <- lm(dist ~ bs(speed, knots = c(K), degree = 2), data = cars)
   u <- seq(4, 25, by = 0.1)  # test model at these speeds
   B <- data.frame(speed = u)  # data.frame(speeds)
   Y <- predict(reg, newdata = B)  # predicted dist for the desired speeds
   lines(u, Y, lwd = 2, col = "red")
 
-#  i.e. we have the following (nice) picture
-#  But if we look at the output of the regression we get this
+# now lets compare their regression coefficients
+  summary(reglin)
   summary(reg)
 
-# Well we can replicate this
+# It should be noted that the second degree spline has an extra parameter!
+# Well it should be easy to replicate the first part of the spline!
   plot(cars)
   u0 <- seq(0, 1, by = 0.01)  # splines run from 0 -> 1 (with the resolution of the curve dictated by how many points you ask for)
-  v1 <- reg$coefficients[2]*u0 + reg$coefficients[1]  # here we calculate y = mx + c m = coefficient 2, c = coefficient 1
+  v1 <- reg$coefficients[3]*u0^2 + reg$coefficients[2]*u0 + reg$coefficients[1]  # here we calculate y = mx + c m = coefficient 2, c = coefficient 1
   x1 <- seq(min(cars$speed), K[1], length = length(u0))  # create times for plotting from first time: min(time), to the first knot: K[1]
   lines(x1, v1, col = "green", lwd = 2)  # draw the line
   u0 <- seq(0, 1, by = 0.01)  # set up the second section of spline
-  v2 <- (reg$coefficients[3] - reg$coefficients[2])*u0 +
+  v2 <- (reg$coefficients[4] - reg$coefficients[3])*u0^2 +
+    (reg$coefficients[3] - reg$coefficients[2])*u0^2 +
     reg$coefficients[1] +
     reg$coefficients[2]  # here we calculate m (as coefficient 3 - coefficient 2) and c (coefficient 1 + coefficient 2)
   x2 <- seq(K[1], max(cars$speed), length = length(u0))  # create times for plotting from the first knot: K[1], to the final time  first time: max(time)
@@ -181,4 +195,3 @@
   with(cars, lines(fixed1 ~ speed, col = "green"))
   with(cars, lines(fixed2 ~ speed, col = "blue"))
   with(cars, lines(fixed3 ~ speed, col = "purple"))
-  
