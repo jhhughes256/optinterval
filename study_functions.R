@@ -947,8 +947,9 @@
 
   auc.interv.lam <- function(par, t) {
     dv <- pred.sumexp(par, unique(t))
-    lambz <- pred.lambdaz(dv, unique(t))
-    tail(dv, 1)/lambz
+    lambz <- try(-pred.lambdaz(dv, t)[2])
+    if (class(lambz) == "try-error") return(0)
+    else return(tail(dv, 1)/lambz)
   }
 
 # Without for loop
